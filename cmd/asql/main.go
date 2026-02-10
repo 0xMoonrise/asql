@@ -26,11 +26,9 @@ func run() error {
 		i++
 	}
 
-	lex := scannerdml.NewLexer()
-	for _, token := range lines[0] {
-		fmt.Println(token)
-		l := lex[token]
-		fmt.Println(l)
+	for i, token := range lines[0] {
+		fmt.Println(i, "token:", token)
+		fmt.Println(scannerdml.Lexer(token))
 	}
 	return nil
 }

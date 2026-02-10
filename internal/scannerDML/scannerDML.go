@@ -1,6 +1,10 @@
 package scannerdml
 
-import "regexp"
+import (
+	"errors"
+	"regexp"
+	"unicode"
+)
 
 type keyword struct {
 	l lexeme
@@ -75,9 +79,14 @@ var tokenRegex = regexp.MustCompile(
 		`>=|<=|<>|!=|[<>=]|` +
 		`[+\-*/]|` +
 		`[(),.]|` +
-		`[a-zA-Z0-9_]*|` +
+		`\w+|` +
 		`\d+|` +
-		`\s+`,
+		`\s+|` +
+		`\W+`,
+)
+
+var isConstOrAlpha = regexp.MustCompile(
+	`\w+|\d+`,
 )
 
 func Tokenize(input string) []string {
@@ -90,4 +99,36 @@ func Tokenize(input string) []string {
 	}
 
 	return tokens
+}
+
+func isNumeric(s string) bool {
+	for _, r := range s {
+		if !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return len(s) > 0
+}
+
+func Lexer(t string) (token keyword, err error) {
+	tableLexer := NewLexer()
+	tk, found := tableLexer[t]
+	if found {
+		return tk, nil
+	}
+
+	kindOfConstant := isConstOrAlpha.MatchString(t)
+	if kindOfConstant {
+
+		if isNumeric(t) {
+			tk = tableLexer["d"]
+			tk.l = lexeme(t)
+			return tk, nil
+		}
+
+		tk = tableLexer["a"]
+		tk.l = lexeme(t)
+		return tk, nil
+	}
+	return keyword{}, errors.New("The token is not in the lexer table")
 }
