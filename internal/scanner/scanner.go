@@ -8,18 +8,18 @@ import (
 	"unicode"
 )
 
-type keyword struct {
+type Keyword struct {
 	L lexeme
 	V value
 	T typ
 }
 
-type lexer map[string]keyword
+type lexer map[string]Keyword
 
 func NewTable() lexer {
 	lex := make(lexer)
 
-	keywords := []keyword{
+	keywords := []Keyword{
 		// keywords (1)
 		{"SELECT", __select, 1},
 		{"FROM", __from, 1},
@@ -68,7 +68,7 @@ func NewTable() lexer {
 	}
 
 	for _, kw := range keywords {
-		lex[string(kw.L)] = keyword{
+		lex[string(kw.L)] = Keyword{
 			L: kw.L,
 			V: kw.V,
 			T: kw.T,
@@ -131,29 +131,40 @@ func isNumeric(s string) bool {
 }
 
 // Apply the criteria for tokens
-func NewLexer() func(t string) (token keyword, err error) {
+func NewLexer() func(t string) (token Keyword, err error) {
 	// Values for dynamic tables
-	var indentifiers int = 400
+	var indentifiers int = 401
 	var constants int = 600
+	var cache = make(map[string]Keyword)
 
-	return func(t string) (token keyword, err error) {
+	return func(t string) (token Keyword, err error) {
 		lexical := NewTable()
 		token, found := lexical[t]
+
 		if found {
 			return
 		}
-		token = keyword{}
-		token.L = lexeme(t)
-		switch {
-		case regexp.MustCompile(keywords).MatchString(t):
-			token.T = 4
-			token.V = value(indentifiers)
-			indentifiers++
+
+		token, found = cache[t]
+		if found {
 			return
+		}
+
+		token = Keyword{}
+		token.L = lexeme(t)
+
+		switch {
 		case regexp.MustCompile(constant).MatchString(t):
 			token.T = 6
 			token.V = value(constants)
 			constants++
+			cache[t] = token
+			return
+		case regexp.MustCompile(keywords).MatchString(t):
+			token.T = 4
+			token.V = value(indentifiers)
+			indentifiers++
+			cache[t] = token
 			return
 		default:
 			err = errors.New("Unknown symbol")
