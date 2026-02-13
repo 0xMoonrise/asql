@@ -1,4 +1,4 @@
-package scannerdml
+package scanner
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ type keyword struct {
 
 type lexer map[string]keyword
 
-func NewLexer() lexer {
+func NewLexerTable() lexer {
 	lex := make(lexer)
 
 	keywords := []keyword{
@@ -110,25 +110,34 @@ func isNumeric(s string) bool {
 	return len(s) > 0
 }
 
-func Lexer(t string) (token keyword, err error) {
-	tableLexer := NewLexer()
-	tk, found := tableLexer[t]
-	if found {
-		return tk, nil
-	}
+func Lexer() func(t string) (token keyword, err error) {
+	var numerics int = 400
+	var alpha int = 200
+	return func(t string) (token keyword, err error) {
+		tableLexer := NewLexerTable()
 
-	kindOfConstant := isConstOrAlpha.MatchString(t)
-	if kindOfConstant {
+		tk, found := tableLexer[t]
+		if found {
+			return tk, nil
+		}
+
+		isValidCosntant := isConstOrAlpha.MatchString(t)
+		if !isValidCosntant {
+			return keyword{}, errors.New("The token is not in the lexer table")
+		}
 
 		if isNumeric(t) {
 			tk = tableLexer["d"]
 			tk.l = lexeme(t)
+			tk.v = value(numerics)
+			numerics++
 			return tk, nil
 		}
 
 		tk = tableLexer["a"]
 		tk.l = lexeme(t)
+		tk.v = value(alpha)
+		alpha++
 		return tk, nil
 	}
-	return keyword{}, errors.New("The token is not in the lexer table")
 }

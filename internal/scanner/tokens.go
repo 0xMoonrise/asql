@@ -1,4 +1,4 @@
-package scannerdml
+package scanner
 
 type lexeme string
 type symbol rune

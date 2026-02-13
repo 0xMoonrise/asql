@@ -2,7 +2,7 @@ ENTRY=./cmd/asql
 TARGET=asql
 
 all:
-	go run $(ENTRY)
+	go run $(ENTRY) -f code.txt
 
 build:
 	go build -o $(TARGET) $(ENTRY)

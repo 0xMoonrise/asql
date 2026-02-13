@@ -1,7 +1,7 @@
 package main
 
 import (
-	"asql/internal/scannerDML"
+	"asql/internal/scanner"
 	"bufio"
 	"fmt"
 	"log"
@@ -16,20 +16,27 @@ func run() error {
 	if err != nil {
 		return err
 	}
-
+	lexScanner := scanner.Lexer()
 	defer reader.Close()
-	scanner := bufio.NewScanner(reader)
+	buffer := bufio.NewScanner(reader)
 
-	for scanner.Scan() {
-		fileLine := scanner.Text()
-		lines[i] = scannerdml.Tokenize(fileLine)
+	for buffer.Scan() {
+		fileLine := buffer.Text()
+		lines[i] = scanner.Tokenize(fileLine)
 		i++
 	}
 
-	for i, token := range lines[0] {
-		fmt.Println(i, "token:", token)
-		fmt.Println(scannerdml.Lexer(token))
+	for i = range len(lines) {
+		token := lines[i]
+		for _, tkn := range token {
+			t, err := lexScanner(tkn)
+			if err != nil {
+				return err
+			}
+			fmt.Println(t)
+		}
 	}
+
 	return nil
 }
 
