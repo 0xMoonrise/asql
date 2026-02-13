@@ -1,102 +1,122 @@
 package scanner
 
 import (
+	"asql/internal/utils"
 	"errors"
 	"regexp"
+	"strings"
 	"unicode"
 )
 
 type keyword struct {
-	l lexeme
-	s symbol
-	v value
-	t typ
+	L lexeme
+	V value
+	T typ
 }
 
 type lexer map[string]keyword
 
-func NewLexerTable() lexer {
+func NewTable() lexer {
 	lex := make(lexer)
 
 	keywords := []keyword{
 		// keywords (1)
-		{"SELECT", 's', __select, 1},
-		{"FROM", 'f', __from, 1},
-		{"WHERE", 'w', __where, 1},
-		{"IN", 'n', __in, 1},
-		{"AND", 'y', __and, 1},
-		{"OR", 'o', __or, 1},
-		{"CREATE", 'c', __create, 1},
-		{"TABLE", 't', __table, 1},
-		{"CHAR", 'h', __char, 1},
-		{"NUMERIC", 'u', __numeric, 1},
-		{"NOT", 'e', __not, 1},
-		{"NULL", 'g', __null, 1},
-		{"CONSTRAINT", 'b', __constraint, 1},
-		{"KEY", 'k', __key, 1},
-		{"PRIMARY", 'p', __primary, 1},
-		{"FOREIGN", 'j', __foreign, 1},
-		{"REFERENCES", 'l', __references, 1},
-		{"INSERT", 'm', __insert, 1},
-		{"INTO", 'q', __into, 1},
-		{"VALUES", 'v', __values, 1},
+		{"SELECT", __select, 1},
+		{"FROM", __from, 1},
+		{"WHERE", __where, 1},
+		{"IN", __in, 1},
+		{"AND", __and, 1},
+		{"OR", __or, 1},
+		{"CREATE", __create, 1},
+		{"TABLE", __table, 1},
+		{"CHAR", __char, 1},
+		{"NUMERIC", __numeric, 1},
+		{"NOT", __not, 1},
+		{"NULL", __null, 1},
+		{"CONSTRAINT", __constraint, 1},
+		{"KEY", __key, 1},
+		{"PRIMARY", __primary, 1},
+		{"FOREIGN", __foreign, 1},
+		{"REFERENCES", __references, 1},
+		{"INSERT", __insert, 1},
+		{"INTO", __into, 1},
+		{"VALUES", __values, 1},
+
 		// delimitators (5)
-		{",", noSym, comma, 5},
-		{".", noSym, dot, 5},
-		{"(", noSym, lparentheses, 5},
-		{")", noSym, rparentheses, 5},
-		{"'", noSym, apostrophe, 5},
+		{",", comma, 5},
+		{".", dot, 5},
+		{"(", lparentheses, 5},
+		{")", rparentheses, 5},
+		{"'", apostrophe, 5},
+
 		// Constants (6)
-		{"d", noSym, numeric, 6},
-		{"a", noSym, alpha, 6},
+		{"d", numeric, 6},
+		{"a", alpha, 6},
+
 		// Operators (7)
-		{"+", noSym, plus, 7},
-		{"-", noSym, minus, 7},
-		{"*", noSym, times, 7},
-		{"/", noSym, divition, 7},
+		{"+", plus, 7},
+		{"-", minus, 7},
+		{"*", times, 7},
+		{"/", divition, 7},
+
 		// Relations (8)
-		{">", noSym, gt, 8},
-		{"<", noSym, lt, 8},
-		{"=", noSym, eq, 8},
-		{">=", noSym, ge, 8},
-		{"<=", noSym, le, 8},
+		{">", gt, 8},
+		{"<", lt, 8},
+		{"=", eq, 8},
+		{">=", ge, 8},
+		{"<=", le, 8},
 	}
 
 	for _, kw := range keywords {
-		lex[string(kw.l)] = keyword{
-			l: kw.l,
-			s: kw.s,
-			v: kw.v,
-			t: kw.t,
+		lex[string(kw.L)] = keyword{
+			L: kw.L,
+			V: kw.V,
+			T: kw.T,
 		}
 	}
 
 	return lex
 }
 
-var tokenRegex = regexp.MustCompile(
-	`'|` +
-		`>=|<=|<>|!=|[<>=]|` +
-		`[+\-*/]|` +
-		`[(),.]|` +
-		`\w+|` +
-		`\d+|` +
-		`\s+|` +
-		`\W+`,
-)
+/*
+   Tokenizer procedure:
+   1. Keywords
+   2. Delimitators
+   3. Constants
+   4. Operators
+   5. Relations
 
-var isConstOrAlpha = regexp.MustCompile(
-	`\w+|\d+`,
+   This could be inefficient because it needs 5 rounds to fill
+   the table and/or determine all the tokens in the source code.
+
+   But its scalable for more kinds of rules.
+*/
+// rules of Tokenizer
+
+var (
+	keywords     = `\b[A-Za-z_][A-Za-z0-9_]*\b` // kewords and identifiers
+	constant     = `\b\d+\b|'[^']*'`            // Strings and numbers
+	delimitators = `[,()]`
+	relations    = `>=|<=|!=|=|>|<`
+	noLexer      = `\W` // Match any char that is not in the lexer
 )
 
 func Tokenize(input string) []string {
-	matches := tokenRegex.FindAllString(input, -1)
-	var tokens []string
-	for _, token := range matches {
-		if token != " " && token != "\n" && token != "\t" && token != "\r" {
-			tokens = append(tokens, token)
-		}
+	rules := []string{
+		keywords,
+		constant,
+		delimitators,
+		relations,
+		noLexer,
 	}
+
+	lexerRule := strings.Join(rules, "|")
+	re := regexp.MustCompile(lexerRule)
+
+	tokens := utils.Filter(
+		utils.Map(re.FindAllString(input, -1), strings.TrimSpace),
+		func(s string) bool { return s != "" },
+	)
 
 	return tokens
 }
@@ -110,34 +130,35 @@ func isNumeric(s string) bool {
 	return len(s) > 0
 }
 
-func Lexer() func(t string) (token keyword, err error) {
-	var numerics int = 400
-	var alpha int = 200
+// Apply the criteria for tokens
+func NewLexer() func(t string) (token keyword, err error) {
+	// Values for dynamic tables
+	var indentifiers int = 400
+	var constants int = 600
+
 	return func(t string) (token keyword, err error) {
-		tableLexer := NewLexerTable()
-
-		tk, found := tableLexer[t]
+		lexical := NewTable()
+		token, found := lexical[t]
 		if found {
-			return tk, nil
+			return
+		}
+		token = keyword{}
+		token.L = lexeme(t)
+		switch {
+		case regexp.MustCompile(`^[a-zA-Z]+$`).MatchString(t):
+			token.T = 4
+			token.V = value(indentifiers)
+			indentifiers++
+			return
+		case regexp.MustCompile(`\d+|'[^']*'`).MatchString(t):
+			token.T = 6
+			token.V = value(constants)
+			constants++
+			return
+		default:
+			err = errors.New("Unknown symbol")
 		}
 
-		isValidCosntant := isConstOrAlpha.MatchString(t)
-		if !isValidCosntant {
-			return keyword{}, errors.New("The token is not in the lexer table")
-		}
-
-		if isNumeric(t) {
-			tk = tableLexer["d"]
-			tk.l = lexeme(t)
-			tk.v = value(numerics)
-			numerics++
-			return tk, nil
-		}
-
-		tk = tableLexer["a"]
-		tk.l = lexeme(t)
-		tk.v = value(alpha)
-		alpha++
-		return tk, nil
+		return
 	}
 }

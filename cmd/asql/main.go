@@ -3,8 +3,12 @@ package main
 import (
 	"asql/internal/scanner"
 	"bufio"
-	"fmt"
 	"log"
+	"log/slog"
+	"os"
+	"strconv"
+
+	"github.com/olekukonko/tablewriter"
 )
 
 func run() error {
@@ -12,31 +16,46 @@ func run() error {
 	lines := make(map[int][]string)
 	i := 0
 
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header([]string{
+		"No.", "Line", "Token", "Type", "Code",
+	})
+
 	reader, err := cmd()
 	if err != nil {
 		return err
 	}
-	lexScanner := scanner.Lexer()
+
 	defer reader.Close()
 	buffer := bufio.NewScanner(reader)
 
 	for buffer.Scan() {
-		fileLine := buffer.Text()
-		lines[i] = scanner.Tokenize(fileLine)
+		rawText := buffer.Text()
+		lines[i] = scanner.Tokenize(rawText)
 		i++
 	}
 
-	for i = range len(lines) {
-		token := lines[i]
-		for _, tkn := range token {
-			t, err := lexScanner(tkn)
+	line := 1
+	lexer := scanner.NewLexer()
+	for i, tokens := range lines {
+		for _, token := range tokens {
+			t, err := lexer(token)
 			if err != nil {
-				return err
+				slog.Error(err.Error(), "line", strconv.Itoa(i+1))
+				continue
 			}
-			fmt.Println(t)
+			table.Append([]string{
+				strconv.Itoa(line),
+				strconv.Itoa(i + 1),
+				string(t.L),
+				strconv.Itoa(int(t.T)),
+				strconv.Itoa(int(t.V)),
+			})
+			line++
 		}
 	}
 
+	table.Render()
 	return nil
 }
 
