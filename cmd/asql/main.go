@@ -7,14 +7,13 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/olekukonko/tablewriter"
 )
 
 func run() error {
-
-	lines := make(map[int][]string)
-	i := 0
+	lines := [][]string{}
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.Header([]string{
@@ -31,8 +30,11 @@ func run() error {
 
 	for buffer.Scan() {
 		rawText := buffer.Text()
-		lines[i] = scanner.Tokenize(rawText)
-		i++
+		if strings.HasPrefix(rawText, "#") { // Check special cace for shebang #!
+			continue
+		}
+		tokens := scanner.Tokenize(rawText)
+		lines = append(lines, tokens)
 	}
 
 	line := 1

@@ -145,12 +145,12 @@ func NewLexer() func(t string) (token keyword, err error) {
 		token = keyword{}
 		token.L = lexeme(t)
 		switch {
-		case regexp.MustCompile(`^[a-zA-Z]+$`).MatchString(t):
+		case regexp.MustCompile(keywords).MatchString(t):
 			token.T = 4
 			token.V = value(indentifiers)
 			indentifiers++
 			return
-		case regexp.MustCompile(`\d+|'[^']*'`).MatchString(t):
+		case regexp.MustCompile(constant).MatchString(t):
 			token.T = 6
 			token.V = value(constants)
 			constants++
