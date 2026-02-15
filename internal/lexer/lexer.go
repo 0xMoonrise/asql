@@ -1,25 +1,30 @@
-package scanner
+package lexer
 
 import (
 	"asql/internal/utils"
 	"errors"
+	"iter"
 	"regexp"
 	"strings"
-	"unicode"
 )
 
-type Keyword struct {
+type Token struct {
 	L lexeme
 	V value
 	T typ
 }
 
-type lexer map[string]Keyword
+type lexer map[string]Token
+
+type TokenStream struct {
+	Tokens []string
+	Lexer  func(t string) (Token, error)
+}
 
 func NewTable() lexer {
 	lex := make(lexer)
 
-	keywords := []Keyword{
+	Tokens := []Token{
 		// keywords (1)
 		{"SELECT", __select, 1},
 		{"FROM", __from, 1},
@@ -49,9 +54,10 @@ func NewTable() lexer {
 		{")", rparentheses, 5},
 		{"'", apostrophe, 5},
 
+		// Dynamics do not need to be declared
 		// Constants (6)
-		{"d", numeric, 6},
-		{"a", alpha, 6},
+		// {"d", numeric, 6},
+		// {"a", alpha, 6},
 
 		// Operators (7)
 		{"+", plus, 7},
@@ -67,11 +73,11 @@ func NewTable() lexer {
 		{"<=", le, 8},
 	}
 
-	for _, kw := range keywords {
-		lex[string(kw.L)] = Keyword{
-			L: kw.L,
-			V: kw.V,
-			T: kw.T,
+	for _, tkn := range Tokens {
+		lex[string(tkn.L)] = Token{
+			L: tkn.L,
+			V: tkn.V,
+			T: tkn.T,
 		}
 	}
 
@@ -94,11 +100,12 @@ func NewTable() lexer {
 // rules of Tokenizer
 
 var (
-	keywords     = `\b[A-Za-z_][A-Za-z0-9_]*\b` // kewords and identifiers
-	constant     = `\b\d+\b|'[^']*'`            // Strings and numbers
-	delimitators = `[,()]`
+	keywords     = `[A-Za-z_][A-Za-z0-9_#]*` // kewords and identifiers
+	constant     = `\b\d+\b|'[^']*'`         // Strings and numbers
+	delimitators = `[\.,()]`
 	relations    = `>=|<=|!=|=|>|<`
-	noLexer      = `\W` // Match any char that is not in the lexer
+	spaces       = `\s+`
+	noLexer      = `[^\w\s.,()#'>=<!]` // Match any char that is not in the lexer
 )
 
 func Tokenize(input string) []string {
@@ -106,6 +113,7 @@ func Tokenize(input string) []string {
 		keywords,
 		constant,
 		delimitators,
+		spaces,
 		relations,
 		noLexer,
 	}
@@ -121,55 +129,63 @@ func Tokenize(input string) []string {
 	return tokens
 }
 
-func isNumeric(s string) bool {
-	for _, r := range s {
-		if !unicode.IsDigit(r) {
-			return false
-		}
-	}
-	return len(s) > 0
-}
-
 // Apply the criteria for tokens
-func NewLexer() func(t string) (token Keyword, err error) {
+func NewLexer() func(t string) (Token, error) {
 	// Values for dynamic tables
 	var indentifiers int = 401
 	var constants int = 600
-	var cache = make(map[string]Keyword)
+	var cache = make(map[string]Token)
+	var lexical lexer = NewTable()
+	// Rules for lexer
+	reConst := regexp.MustCompile(constant)
+	reKws := regexp.MustCompile(keywords)
 
-	return func(t string) (token Keyword, err error) {
-		lexical := NewTable()
-		token, found := lexical[t]
-
-		if found {
-			return
+	return func(t string) (Token, error) {
+		// check the static lexcial table
+		key := strings.ToUpper(t)
+		if token, found := lexical[key]; found {
+			return token, nil
 		}
-
-		token, found = cache[t]
-		if found {
-			return
+		// search the cache
+		if token, found := cache[t]; found {
+			return token, nil
 		}
-
-		token = Keyword{}
-		token.L = lexeme(t)
+		// and then it could be a non-lexical character
+		// or a valid identifier/constant
+		tkn := Token{}
+		tkn.L = lexeme(t)
 
 		switch {
-		case regexp.MustCompile(constant).MatchString(t):
-			token.T = 6
-			token.V = value(constants)
+		case reConst.MatchString(t):
+			tkn.T = 6
+			tkn.V = value(constants)
 			constants++
-			cache[t] = token
-			return
-		case regexp.MustCompile(keywords).MatchString(t):
-			token.T = 4
-			token.V = value(indentifiers)
+			cache[t] = tkn
+			return tkn, nil
+		case reKws.MatchString(t):
+			tkn.T = 4
+			tkn.V = value(indentifiers)
 			indentifiers++
-			cache[t] = token
-			return
+			cache[t] = tkn
+			return tkn, nil
 		default:
-			err = errors.New("Unknown symbol")
+			return tkn, errors.New("Unknown symbol")
 		}
+	}
+}
 
-		return
+type TokenResult struct {
+	Token Token
+	Err   error
+}
+
+func (c *TokenStream) GenTokenStream() iter.Seq[TokenResult] {
+	return func(yield func(TokenResult) bool) {
+		for _, t := range c.Tokens {
+			token, err := c.Lexer(t)
+			if !yield(TokenResult{Token: token, Err: err}) {
+				return
+			}
+		}
 	}
 }

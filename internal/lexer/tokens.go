@@ -1,11 +1,9 @@
-package scanner
+package lexer
 
 type lexeme string
 type symbol rune
 type value int
 type typ int
-
-const noSym symbol = 0
 
 // keywords
 const (

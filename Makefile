@@ -1,8 +1,8 @@
-ENTRY=./cmd/asql
+ENTRY=./cmd/cli
 TARGET=asql
 
 all:
-	go run $(ENTRY) -f code.txt
+	go run $(ENTRY) -f code.asql
 
 build:
 	go build -o $(TARGET) $(ENTRY)

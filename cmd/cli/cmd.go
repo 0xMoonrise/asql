@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func cmd() (reader io.ReadCloser, err error) {
+func readFile() (reader io.ReadCloser, err error) {
 	filePath := flag.String("f", "", "Path file input")
 	flag.Parse()
 
