@@ -10,20 +10,22 @@ import (
 )
 
 type state struct {
-	err error
+	err   error
+	stage string
 }
 
-func run() error {
+func run() state {
 
 	// lexTable := make(map[string]lexTab)
 	lines := [][]string{}
 	tokenStream := [][]lexer.Token{}
-	state := state{} // global state of all stages
 
 	reader, err := readFile()
 	if err != nil {
-		return err
+		return state{err: err, stage: "booting"}
 	}
+
+	state := state{} // global state of all stages
 
 	defer reader.Close()
 	buffer := bufio.NewScanner(reader)
@@ -55,21 +57,21 @@ func run() error {
 		for result := range lex.GenTokenStream() {
 			if result.Err != nil {
 				state.err = result.Err
+				state.stage = "lexer"
 				slog.Error(fmt.Sprintf("line %d: %v", i+1, result.Err))
 				continue
 			}
-			fmt.Println(result.Token)
 			tokens = append(tokens, result.Token)
 		}
 		tokenStream = append(tokenStream, tokens)
 	}
 
 	lexer.PrintTable(tokenStream)
-	return nil
+	return state
 }
 
 func main() {
-	if err := run(); err != nil {
-		log.Fatal(err)
+	if state := run(); state.err != nil {
+		log.Fatalf("[%v] error:%v", state.stage, state.err.Error())
 	}
 }

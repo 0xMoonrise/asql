@@ -73,11 +73,11 @@ func NewTable() lexer {
 		{"<=", le, 8},
 	}
 
-	for _, tkn := range Tokens {
-		lex[string(tkn.L)] = Token{
-			L: tkn.L,
-			V: tkn.V,
-			T: tkn.T,
+	for _, token := range Tokens {
+		lex[string(token.L)] = Token{
+			L: token.L,
+			V: token.V,
+			T: token.T,
 		}
 	}
 
@@ -102,10 +102,9 @@ func NewTable() lexer {
 var (
 	keywords     = `[A-Za-z_][A-Za-z0-9_#]*` // kewords and identifiers
 	constant     = `\b\d+\b|'[^']*'`         // Strings and numbers
-	delimitators = `[\.,()]`
-	relations    = `>=|<=|!=|=|>|<`
-	spaces       = `\s+`
-	noLexer      = `[^\w\s.,()#'>=<!]` // Match any char that is not in the lexer
+	delimitators = `[.,()*]`                 // is '*' a delimitator?
+	relations    = `>=|<=|!=|=|>|<`          //
+	noLexer      = `[^\w\s.,()#'>=<!]`       // Any to catch errors
 )
 
 func Tokenize(input string) []string {
@@ -113,7 +112,6 @@ func Tokenize(input string) []string {
 		keywords,
 		constant,
 		delimitators,
-		spaces,
 		relations,
 		noLexer,
 	}
@@ -152,24 +150,24 @@ func NewLexer() func(t string) (Token, error) {
 		}
 		// and then it could be a non-lexical character
 		// or a valid identifier/constant
-		tkn := Token{}
-		tkn.L = lexeme(t)
+		token := Token{}
+		token.L = lexeme(t)
 
 		switch {
 		case reConst.MatchString(t):
-			tkn.T = 6
-			tkn.V = value(constants)
+			token.T = 6
+			token.V = value(constants)
 			constants++
-			cache[t] = tkn
-			return tkn, nil
+			cache[t] = token
+			return token, nil
 		case reKws.MatchString(t):
-			tkn.T = 4
-			tkn.V = value(indentifiers)
+			token.T = 4
+			token.V = value(indentifiers)
 			indentifiers++
-			cache[t] = tkn
-			return tkn, nil
+			cache[t] = token
+			return token, nil
 		default:
-			return tkn, errors.New("Unknown symbol")
+			return token, errors.New("Unknown symbol")
 		}
 	}
 }

@@ -1,7 +1,6 @@
 package lexer
 
 type lexeme string
-type symbol rune
 type value int
 type typ int
 
