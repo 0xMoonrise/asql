@@ -50,8 +50,10 @@ func run() state {
 		[][]string -> [][]tokens
 	*/
 
+	//Lexer: satage 1
+	//TODO: should I move to `lexer` package?
 	lex := &lexer.TokenStream{Lexer: lexer.NewLexer()}
-	for i, line := range lines {
+	for i, line := range lines { // <- Entry point
 		lex.Tokens = line
 		tokens := []lexer.Token{}
 		for result := range lex.GenTokenStream() {
@@ -72,6 +74,6 @@ func run() state {
 
 func main() {
 	if state := run(); state.err != nil {
-		log.Fatalf("[%v] error:%v", state.stage, state.err.Error())
+		log.Fatalf("[%v] error: %v", state.stage, state.err.Error())
 	}
 }

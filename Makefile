@@ -13,3 +13,5 @@ clean:
 test:
 	go test ./...
 
+server:
+	go run ./cmd/server

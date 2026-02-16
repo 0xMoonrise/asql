@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Asql</title>
+    <script src="/js/htmx.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+</head>
+<body>
+    <main class="container">
+        <h1>Asql</h1>
+        <form hx-post="/lexer"
+              hx-target="#result"
+              hx-trigger="submit">
+            <textarea
+              name="text"
+              rows="5"></textarea>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button type="button" 
+                        hx-post="/asql"
+                        hx-include="[name='text']"
+                        hx-target="#result"
+                        style="width: auto;">Run all</button>
+                
+                <button type="button" 
+                        hx-post="/lexer"
+                        hx-include="[name='text']"
+                        hx-target="#result"
+                        style="width: auto;">Lexer</button>
+                
+            </div>
+        </form>
+        
+        <div id="result"></div>
+    </main>
+</body>
