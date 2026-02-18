@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"asql/internal/lexer"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -123,6 +122,7 @@ func (app *app) lexer(c *gin.Context) {
 			tokens = append(tokens, result.Token)
 		}
 		tokenStream = append(tokenStream, tokens)
+
 	}
 
 	data := tableLexer(tokenStream)

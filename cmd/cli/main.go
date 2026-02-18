@@ -32,7 +32,6 @@ func run() state {
 
 	for buffer.Scan() {
 		rawText := buffer.Text()
-
 		if strings.HasPrefix(rawText, "#") { // Check special cace for shebang #!
 			continue
 		}
