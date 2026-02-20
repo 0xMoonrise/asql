@@ -9,9 +9,11 @@ import (
 )
 
 type Token struct {
-	L lexeme
-	V value
-	T typ
+	L   lexeme
+	V   value
+	T   typ
+	Row int
+	Col int
 }
 
 type lexer map[string]Token
@@ -26,51 +28,43 @@ func NewTable() lexer {
 
 	Tokens := []Token{
 		// keywords (1)
-		{"SELECT", __select, 1},
-		{"FROM", __from, 1},
-		{"WHERE", __where, 1},
-		{"IN", __in, 1},
-		{"AND", __and, 1},
-		{"OR", __or, 1},
-		{"CREATE", __create, 1},
-		{"TABLE", __table, 1},
-		{"CHAR", __char, 1},
-		{"NUMERIC", __numeric, 1},
-		{"NOT", __not, 1},
-		{"NULL", __null, 1},
-		{"CONSTRAINT", __constraint, 1},
-		{"KEY", __key, 1},
-		{"PRIMARY", __primary, 1},
-		{"FOREIGN", __foreign, 1},
-		{"REFERENCES", __references, 1},
-		{"INSERT", __insert, 1},
-		{"INTO", __into, 1},
-		{"VALUES", __values, 1},
-
+		{L: "SELECT", V: __select, T: 1},
+		{L: "FROM", V: __from, T: 1},
+		{L: "WHERE", V: __where, T: 1},
+		{L: "IN", V: __in, T: 1},
+		{L: "AND", V: __and, T: 1},
+		{L: "OR", V: __or, T: 1},
+		{L: "CREATE", V: __create, T: 1},
+		{L: "TABLE", V: __table, T: 1},
+		{L: "CHAR", V: __char, T: 1},
+		{L: "NUMERIC", V: __numeric, T: 1},
+		{L: "NOT", V: __not, T: 1},
+		{L: "NULL", V: __null, T: 1},
+		{L: "CONSTRAINT", V: __constraint, T: 1},
+		{L: "KEY", V: __key, T: 1},
+		{L: "PRIMARY", V: __primary, T: 1},
+		{L: "FOREIGN", V: __foreign, T: 1},
+		{L: "REFERENCES", V: __references, T: 1},
+		{L: "INSERT", V: __insert, T: 1},
+		{L: "INTO", V: __into, T: 1},
+		{L: "VALUES", V: __values, T: 1},
 		// delimitators (5)
-		{",", comma, 5},
-		{".", dot, 5},
-		{"(", lparentheses, 5},
-		{")", rparentheses, 5},
-		{"'", apostrophe, 5},
-
-		// Dynamics do not need to be declared
-		// Constants (6)
-		// {"d", numeric, 6},
-		// {"a", alpha, 6},
-
+		{L: ",", V: comma, T: 5},
+		{L: ".", V: dot, T: 5},
+		{L: "(", V: lparentheses, T: 5},
+		{L: ")", V: rparentheses, T: 5},
+		{L: "'", V: apostrophe, T: 5},
 		// Operators (7)
-		{"+", plus, 7},
-		{"-", minus, 7},
-		{"*", times, 7},
-		{"/", divition, 7},
-
+		// {L: "+", V: plus, T: 7},
+		// {L: "-", V: minus, T: 7},
+		// {L: "*", V: times, T: 7},
+		// {L: "/", V: divition, T: 7},
 		// Relations (8)
-		{">", gt, 8},
-		{"<", lt, 8},
-		{"=", eq, 8},
-		{">=", ge, 8},
-		{"<=", le, 8},
+		{L: ">", V: gt, T: 8},
+		{L: "<", V: lt, T: 8},
+		{L: "=", V: eq, T: 8},
+		{L: ">=", V: ge, T: 8},
+		{L: "<=", V: le, T: 8},
 	}
 
 	for _, token := range Tokens {
@@ -177,11 +171,11 @@ type TokenResult struct {
 	Err   error
 }
 
-func (c *TokenStream) GenTokenStream() iter.Seq[TokenResult] {
-	return func(yield func(TokenResult) bool) {
-		for _, t := range c.Tokens {
+func (c *TokenStream) GenTokenStream() iter.Seq2[int, TokenResult] {
+	return func(yield func(int, TokenResult) bool) {
+		for i, t := range c.Tokens {
 			token, err := c.Lexer(t)
-			if !yield(TokenResult{Token: token, Err: err}) {
+			if !yield(i, TokenResult{Token: token, Err: err}) {
 				return
 			}
 		}

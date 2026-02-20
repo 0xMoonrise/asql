@@ -16,23 +16,22 @@ type lexTab struct {
 	line  string
 }
 
-func tableLexer(tokens [][]lexer.Token) gin.H {
+func tableLexer(tokens []lexer.Token) gin.H {
 	var entries []lexTab
 	var cache = make(map[string]lexTab)
 
-	for i, tkns := range tokens {
-		for _, tkn := range tkns {
-			if token, found := cache[string(tkn.L)]; found {
-				tab := lexTab{
-					token: tkn,
-					line:  token.line + "," + strconv.Itoa(i+1),
-				}
-				cache[string(tkn.L)] = tab
-				continue
+	for _, token := range tokens {
+		if current, found := cache[string(token.L)]; found {
+			tab := lexTab{
+				token: token,
+				line:  current.line + "," + strconv.Itoa(token.Col),
 			}
-			tab := lexTab{token: tkn, line: strconv.Itoa(i + 1)}
-			cache[string(tkn.L)] = tab
+			cache[string(token.L)] = tab
+			continue
 		}
+
+		tab := lexTab{token: token, line: strconv.Itoa(token.Col)}
+		cache[string(token.L)] = tab
 	}
 
 	for _, v := range cache {
@@ -107,22 +106,24 @@ func (app *app) lexer(c *gin.Context) {
 		lines = append(lines, tokens)
 	}
 
-	tokenStream := [][]lexer.Token{}
+	tokenStream := []lexer.Token{}
 	errors := []string{}
 	lex := &lexer.TokenStream{Lexer: lexer.NewLexer()}
 
-	for i, line := range lines { // <- Entry point
+	for col, line := range lines { // <- Entry point
 		lex.Tokens = line
-		tokens := []lexer.Token{}
-		for result := range lex.GenTokenStream() {
+		for row, result := range lex.GenTokenStream() {
 			if result.Err != nil {
-				errors = append(errors, fmt.Sprintf("Line %d: %v", i+1, result.Err))
+				errors = append(errors, fmt.Sprintf("Line %d: %v", col+1, result.Err))
 				continue
 			}
-			tokens = append(tokens, result.Token)
-		}
-		tokenStream = append(tokenStream, tokens)
 
+			token := result.Token
+			token.Col = col + 1
+			token.Row = row + 1
+
+			tokenStream = append(tokenStream, token)
+		}
 	}
 
 	data := tableLexer(tokenStream)

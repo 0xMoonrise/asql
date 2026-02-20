@@ -18,8 +18,7 @@ func run() state {
 
 	// lexTable := make(map[string]lexTab)
 	lines := [][]string{}
-	tokenStream := [][]lexer.Token{}
-
+	tokenStream := []lexer.Token{}
 	reader, err := readFile()
 	if err != nil {
 		return state{err: err, stage: "booting"}
@@ -52,19 +51,22 @@ func run() state {
 	//Lexer: satage 1
 	//TODO: should I move to `lexer` package?
 	lex := &lexer.TokenStream{Lexer: lexer.NewLexer()}
-	for i, line := range lines { // <- Entry point
+	for col, line := range lines { // <- Entry point
 		lex.Tokens = line
-		tokens := []lexer.Token{}
-		for result := range lex.GenTokenStream() {
+		for row, result := range lex.GenTokenStream() {
+
 			if result.Err != nil {
 				state.err = result.Err
 				state.stage = "lexer"
-				slog.Error(fmt.Sprintf("line %d: %v", i+1, result.Err))
+				slog.Error(fmt.Sprintf("line %d: %v", col+1, result.Err))
 				continue
 			}
-			tokens = append(tokens, result.Token)
+
+			token := result.Token
+			token.Col = col + 1
+			token.Row = row + 1
+			tokenStream = append(tokenStream, token)
 		}
-		tokenStream = append(tokenStream, tokens)
 	}
 
 	lexer.PrintTable(tokenStream)

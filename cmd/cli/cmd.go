@@ -9,7 +9,6 @@ import (
 func readFile() (reader io.ReadCloser, err error) {
 	filePath := flag.String("f", "", "Path file input")
 	flag.Parse()
-
 	if *filePath != "" {
 		file, err := os.Open(*filePath)
 		if err != nil {

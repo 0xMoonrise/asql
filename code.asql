@@ -1,13 +1,7 @@
 #!asql -f
-SELECT m#,
-       mnombre
-FROM   materias
-WHERE  m# IN
-       (
-              SELECT m#
-              FROM   inscritos
-              WHERE  a# IN
-                     (
-                            SELECT a# &
-                            FROM   alumnos
-                            WHERE  anombre='MESSI LIONEL'))
+SELECT ANOMBRE
+FROM ALUMNOS,INSCRITOS,CARRERAS
+WHERE ALUMNOS.A#=INSCRITOS.A# AND ALUMNOS.C#=CARRERAS.C#
+AND INSCRITOS.SEMESTRE='2010I'
+AND CARRERAS.CNOMBRE='ISC'
+AND ALUMNOS.GENERACION='2010'
