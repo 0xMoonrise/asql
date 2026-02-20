@@ -13,7 +13,7 @@ type lexTab struct {
 	line  string
 }
 
-func PrintTable(tokens []Token) {
+func PrintLexer(tokens []Token) {
 	var entries []lexTab
 	var cache = make(map[string]lexTab)
 
@@ -37,13 +37,13 @@ func PrintTable(tokens []Token) {
 		if current, found := cache[string(token.L)]; found {
 			tab := lexTab{
 				token: token,
-				line:  current.line + "," + strconv.Itoa(token.Col),
+				line:  current.line + "," + strconv.Itoa(token.Line),
 			}
 			cache[string(token.L)] = tab
 			continue
 		}
 
-		tab := lexTab{token: token, line: strconv.Itoa(token.Col)}
+		tab := lexTab{token: token, line: strconv.Itoa(token.Line)}
 		cache[string(token.L)] = tab
 	}
 

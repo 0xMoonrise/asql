@@ -9,11 +9,10 @@ import (
 )
 
 type Token struct {
-	L   lexeme
-	V   value
-	T   typ
-	Row int
-	Col int
+	L    lexeme
+	V    value
+	T    typ
+	Line int
 }
 
 type lexer map[string]Token
@@ -122,7 +121,7 @@ func Tokenize(input string) []string {
 }
 
 // Apply the criteria for tokens
-func NewLexer() func(t string) (Token, error) {
+func lexerTable() func(t string) (Token, error) {
 	// Values for dynamic tables
 	var indentifiers int = 401
 	var constants int = 600
@@ -180,4 +179,37 @@ func (c *TokenStream) GenTokenStream() iter.Seq2[int, TokenResult] {
 			}
 		}
 	}
+}
+
+type ErrorState struct {
+	L    lexeme
+	Err  error
+	Line int
+}
+
+func Lexer(lines [][]string) (tokenStream []Token, errors []ErrorState) {
+
+	lex := &TokenStream{Lexer: lexerTable()}
+
+	for i, line := range lines { // <- Entry point
+		lex.Tokens = line
+		for _, result := range lex.GenTokenStream() {
+
+			if result.Err != nil {
+				newError := ErrorState{
+					L:    result.Token.L,
+					Err:  result.Err,
+					Line: i + 1,
+				}
+				errors = append(errors, newError)
+				continue
+			}
+
+			token := result.Token
+			token.Line = i + 1
+			tokenStream = append(tokenStream, token)
+		}
+	}
+
+	return
 }

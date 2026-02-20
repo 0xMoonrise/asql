@@ -5,26 +5,17 @@ import (
 	"bufio"
 	"fmt"
 	"log"
-	"log/slog"
 	"strings"
 )
 
-type state struct {
-	err   error
-	stage string
-}
+func run() error {
 
-func run() state {
-
-	// lexTable := make(map[string]lexTab)
 	lines := [][]string{}
-	tokenStream := []lexer.Token{}
 	reader, err := readFile()
-	if err != nil {
-		return state{err: err, stage: "booting"}
-	}
 
-	state := state{} // global state of all stages
+	if err != nil {
+		return err
+	}
 
 	defer reader.Close()
 	buffer := bufio.NewScanner(reader)
@@ -38,43 +29,20 @@ func run() state {
 		tokens := lexer.Tokenize(rawText)
 		lines = append(lines, tokens)
 	}
-	/*
-		we should return a lex table an example:
-		1:[TOKENS]
-		2:[TOKENS]
-		3:[TOKENS]
-		The order and the lines must be consistent
-		to the original source
-		[][]string -> [][]tokens
-	*/
 
 	//Lexer: satage 1
-	//TODO: should I move to `lexer` package?
-	lex := &lexer.TokenStream{Lexer: lexer.NewLexer()}
-	for col, line := range lines { // <- Entry point
-		lex.Tokens = line
-		for row, result := range lex.GenTokenStream() {
+	tokenStream, lexerErrors := lexer.Lexer(lines)
+	lexer.PrintLexer(tokenStream)
 
-			if result.Err != nil {
-				state.err = result.Err
-				state.stage = "lexer"
-				slog.Error(fmt.Sprintf("line %d: %v", col+1, result.Err))
-				continue
-			}
-
-			token := result.Token
-			token.Col = col + 1
-			token.Row = row + 1
-			tokenStream = append(tokenStream, token)
-		}
+	for _, state := range lexerErrors {
+		fmt.Println("[Lexer]", state.Err, "line", state.Line, "token", state.L)
 	}
 
-	lexer.PrintTable(tokenStream)
-	return state
+	return err
 }
 
 func main() {
-	if state := run(); state.err != nil {
-		log.Fatalf("[%v] error: %v", state.stage, state.err.Error())
+	if err := run(); err != nil {
+		log.Fatal(err)
 	}
 }

@@ -24,13 +24,13 @@ func tableLexer(tokens []lexer.Token) gin.H {
 		if current, found := cache[string(token.L)]; found {
 			tab := lexTab{
 				token: token,
-				line:  current.line + "," + strconv.Itoa(token.Col),
+				line:  current.line + "," + strconv.Itoa(token.Line),
 			}
 			cache[string(token.L)] = tab
 			continue
 		}
 
-		tab := lexTab{token: token, line: strconv.Itoa(token.Col)}
+		tab := lexTab{token: token, line: strconv.Itoa(token.Line)}
 		cache[string(token.L)] = tab
 	}
 
@@ -106,24 +106,11 @@ func (app *app) lexer(c *gin.Context) {
 		lines = append(lines, tokens)
 	}
 
-	tokenStream := []lexer.Token{}
+	tokenStream, lexerErrors := lexer.Lexer(lines)
 	errors := []string{}
-	lex := &lexer.TokenStream{Lexer: lexer.NewLexer()}
 
-	for col, line := range lines { // <- Entry point
-		lex.Tokens = line
-		for row, result := range lex.GenTokenStream() {
-			if result.Err != nil {
-				errors = append(errors, fmt.Sprintf("Line %d: %v", col+1, result.Err))
-				continue
-			}
-
-			token := result.Token
-			token.Col = col + 1
-			token.Row = row + 1
-
-			tokenStream = append(tokenStream, token)
-		}
+	for _, err := range lexerErrors {
+		errors = append(errors, fmt.Sprintf("Line %d: %v", err.Line, err.Err))
 	}
 
 	data := tableLexer(tokenStream)
