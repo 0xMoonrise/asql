@@ -54,10 +54,10 @@ func NewTable() lexer {
 		{L: ")", V: rparentheses, T: 5},
 		{L: "'", V: apostrophe, T: 5},
 		// Operators (7)
-		// {L: "+", V: plus, T: 7},
-		// {L: "-", V: minus, T: 7},
-		// {L: "*", V: times, T: 7},
-		// {L: "/", V: divition, T: 7},
+		{L: "+", V: plus, T: 7},
+		{L: "-", V: minus, T: 7},
+		{L: "*", V: times, T: 7},
+		{L: "/", V: divition, T: 7},
 		// Relations (8)
 		{L: ">", V: gt, T: 8},
 		{L: "<", V: lt, T: 8},
@@ -95,7 +95,7 @@ func NewTable() lexer {
 var (
 	keywords     = `[A-Za-z_][A-Za-z0-9_#]*` // kewords and identifiers
 	constant     = `\b\d+\b|'[^']*'`         // Strings and numbers
-	delimitators = `[.,()*]`                 // is '*' a delimitator?
+	delimitators = `[.,()*']`                // is '*' a delimitator?
 	relations    = `>=|<=|!=|=|>|<`          //
 	noLexer      = `[^\w\s.,()#'>=<!]`       // Any to catch errors
 )
