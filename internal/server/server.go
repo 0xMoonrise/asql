@@ -10,7 +10,7 @@ type app struct {
 
 func NewServer() *gin.Engine {
 	router := gin.Default()
-
+	router.SetTrustedProxies([]string{"172.18.0.0/16"})
 	core := app{}
 
 	router.GET("/", core.root)

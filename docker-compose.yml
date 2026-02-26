@@ -18,20 +18,26 @@ services:
     container_name: asql-streamlit
     environment:
       - APP_URL=http://asql:8080
+      - HOME=/app
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
     networks:
       - internal
     restart: unless-stopped
     depends_on:
       - asql
+    volumes:
+    - streamlit:/home/streamlit
 
   caddy:
-    image: caddy:alpine
+    image: ghcr.io/caddybuilds/caddy-cloudflare:alpine
     container_name: asql-caddy
+    environment:
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_certs:/etc/caddy/certs
     networks:
@@ -44,6 +50,7 @@ services:
 volumes:
   caddy_data:
   caddy_certs:
+  streamlit:
 
 networks:
   internal:
