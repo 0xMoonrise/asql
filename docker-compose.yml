@@ -4,11 +4,11 @@ services:
       context: .
       dockerfile: Dockerfiles/Dockerfile.app
     container_name: asql-app
-    ports:
-      - "8080:8080"
     environment:
-      - PORT=8080
       - HOST=0.0.0.0
+      - PORT=8080
+    networks:
+      - internal
     restart: unless-stopped
 
   streamlit:
@@ -20,6 +20,16 @@ services:
       - "8501:8501"
     environment:
       - APP_URL=http://app:8080
+    networks:
+      - internal
+      - public
     restart: unless-stopped
     depends_on:
       - app
+
+networks:
+  internal:
+    driver: bridge
+    internal: true
+  public:
+    driver: bridge
