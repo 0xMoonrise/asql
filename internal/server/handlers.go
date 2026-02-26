@@ -125,3 +125,34 @@ func (app *app) root(c *gin.Context) {
 		"title": "main",
 	})
 }
+
+func (app *app) run(c *gin.Context) {
+	formText := c.PostForm("text")
+
+	if len(formText) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "No source code were provided",
+		})
+		return
+	}
+
+	lines := [][]string{}
+	for str := range strings.SplitSeq(formText, "\n") {
+		tokens := lexer.Tokenize(str)
+		lines = append(lines, tokens)
+	}
+
+	tokenStream, lexerErrors := lexer.Lexer(lines)
+	errors := []string{}
+
+	for _, err := range lexerErrors {
+		errors = append(errors, fmt.Sprintf("Line %d: %v", err.Line, err.Err))
+	}
+
+	data := tableLexer(tokenStream)
+	if len(errors) > 0 {
+		data["Errors"] = errors
+	}
+
+	c.JSON(http.StatusOK, data)
+}

@@ -19,6 +19,7 @@ func NewServer() *gin.Engine {
 	router.GET("/", core.root)
 	router.GET("/check", core.health)
 	router.POST("/lexer", core.lexer)
+	router.POST("/run", core.run)
 
 	return router
 }

@@ -1,2 +1,8 @@
+streamlit/dev/*
+streamlit/__pycache__/*
+**/__pycache__/*
+*.pyc
+*.pyo
+
 asql
 .env*

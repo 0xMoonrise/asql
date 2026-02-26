@@ -97,7 +97,7 @@ var (
 	constant     = `\b\d+\b|'[^']*'`         // Strings and numbers
 	delimitators = `[.,()*']`                // is '*' a delimitator?
 	relations    = `>=|<=|!=|=|>|<`          //
-	noLexer      = `[^\w\s.,()#'>=<!]`       // Any to catch errors
+	noLexer      = `[^\w\s.,()'>=<]`         // Any to catch errors
 )
 
 func Tokenize(input string) []string {

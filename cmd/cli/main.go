@@ -12,7 +12,6 @@ func run() error {
 
 	lines := [][]string{}
 	reader, err := readFile()
-
 	if err != nil {
 		return err
 	}
