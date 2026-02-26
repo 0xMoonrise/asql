@@ -1,0 +1,3 @@
+asql.nullmind.com {
+    reverse_proxy streamlit:8501
+}
