@@ -88,38 +88,6 @@ func (app *app) health(c *gin.Context) {
 	})
 }
 
-func (app *app) lexer(c *gin.Context) {
-
-	formText := c.PostForm("text")
-	c.Header("HX-Reswap", "innerHTML")
-
-	if len(formText) == 0 {
-		c.HTML(http.StatusOK, "error.html", gin.H{
-			"message": "No source code were provided",
-		})
-		return
-	}
-
-	lines := [][]string{}
-	for str := range strings.SplitSeq(formText, "\n") {
-		tokens := lexer.Tokenize(str)
-		lines = append(lines, tokens)
-	}
-
-	tokenStream, lexerErrors := lexer.Lexer(lines)
-	errors := []string{}
-
-	for _, err := range lexerErrors {
-		errors = append(errors, fmt.Sprintf("Line %d: %v", err.Line, err.Err))
-	}
-
-	data := tableLexer(tokenStream)
-	if len(errors) > 0 {
-		data["Errors"] = errors
-	}
-	c.HTML(http.StatusOK, "tables.html", data)
-}
-
 func (app *app) root(c *gin.Context) {
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"title": "main",

@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfiles/Dockerfile.app
+    container_name: asql-app
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+    restart: unless-stopped
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfiles/Dockerfile.st
+    container_name: asql-streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      - APP_URL=http://app:8080
+    restart: unless-stopped
+    depends_on:
+      - app

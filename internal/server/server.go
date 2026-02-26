@@ -13,12 +13,8 @@ func NewServer() *gin.Engine {
 
 	core := app{}
 
-	router.LoadHTMLGlob("templates/*")
-	router.Static("/js", "/opt/lib/htmx")
-
 	router.GET("/", core.root)
 	router.GET("/check", core.health)
-	router.POST("/lexer", core.lexer)
 	router.POST("/run", core.run)
 
 	return router

@@ -3,7 +3,10 @@ import streamlit as st
 from code_editor import code_editor
 import requests
 import pandas as pd
+import os
 import utils
+
+app_url = os.getenv("APP_URL", "http://localhost:8080")
 
 custom_buttons = [
     {
@@ -57,7 +60,7 @@ if response["type"] == "submit" and response["text"]:
 
     try:
         res = requests.post(
-            "http://127.0.0.1:8080/run",
+            f"{app_url}/run",
             data={"text": query}
         )
         res.raise_for_status()
