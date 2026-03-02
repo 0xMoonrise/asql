@@ -23,7 +23,10 @@ CADDYFILE=Caddy/Caddyfile
 MODE=release
 CLOUDFLARE_API_TOKEN=
 ```
-
+To start the deploy, just run:
+```
+docker compose up -d
+```
 ### Develop
 
 ```
