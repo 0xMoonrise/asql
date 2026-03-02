@@ -198,7 +198,7 @@ func Lexer(lines [][]string) (tokenStream []Token, errors []ErrorState) {
 			if result.Err != nil {
 				newError := ErrorState{
 					L:    result.Token.L,
-					Err:  result.Err,
+					Err:  UnknownSymbol,
 					Line: i + 1,
 				}
 				errors = append(errors, newError)

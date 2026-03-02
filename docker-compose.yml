@@ -38,12 +38,12 @@ services:
     image: ghcr.io/caddybuilds/caddy-cloudflare:alpine
     container_name: asql-caddy
     environment:
-      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-""}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./${CADDYFILE:-Caddyfile.dev}:/etc/caddy/Caddyfile
+      - ./${CADDYFILE}:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_certs:/etc/caddy/certs
     networks:
