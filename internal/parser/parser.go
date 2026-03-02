@@ -5,31 +5,6 @@ import (
 	"fmt"
 )
 
-// Start
-// Push('$')              ->  stack := []int{199, 300}
-// Push(300)
-// Append '$' to the end of the Token Table
-// PTR = Pointer to the first Token in the Token Table  ->  pos := 0
-// Repeat
-//     X = Pop()                          ->  top := stack[len(stack)-1]
-//     K = TokenTable[PTR]                ->  cur := input[pos]
-//
-//     If (X = TERMINAL) or (X = '$') then
-//         If (X = K) then
-//             Advance PTR                ->  pos++  and  pop stack
-//         Else
-//             ERROR()                    ->  unexpected token, X != K
-//
-//     Else
-//         If (ParseTable[X,K] = PRODUCTION) then
-//             If (PRODUCTION <> 'λ') then
-//                 Push(PRODUCTION) in reverse order
-//         Else
-//             ERROR()                    ->  empty cell in parse table
-//
-// Until X = '$'
-// End
-
 var parseTable = map[int]map[int][]int{
 	300: {
 		10: {10, 301, 11, 306, 310},
@@ -115,7 +90,56 @@ var parseTable = map[int]map[int][]int{
 	},
 }
 
+// Start
+// Push('$')              ->  stack := []int{199, 300}
+// Push(300)
+// Append '$' to the end of the Token Table
+// PTR = Pointer to the first Token in the Token Table  ->  pos := 0
+// Repeat
+//     X = Pop()                          ->  top := stack[len(stack)-1]
+//     K = TokenTable[PTR]                ->  cur := input[pos]
+//
+//     If (X = TERMINAL) or (X = '$') then
+//         If (X = K) then
+//             Advance PTR                ->  pos++  and  pop stack
+//         Else
+//             ERROR()                    ->  unexpected token, X != K
+//
+//     Else
+//         If (ParseTable[X,K] = PRODUCTION) then
+//             If (PRODUCTION <> 'λ') then
+//                 Push(PRODUCTION) in reverse order
+//         Else
+//             ERROR()                    ->  empty cell in parse table
+//
+// Until X = '$'
+// End
+
+type stackParser struct {
+	top   int
+	ptr   int
+	stack []int
+}
+
+func (s *stackParser) push(value int) {
+	s.stack = append(s.stack, value)
+}
+
+func newStackParser() *stackParser {
+	return &stackParser{
+		top:   1,
+		ptr:   0,
+		stack: []int{},
+	}
+}
+
 func Parser(tokenStream []lexer.Token) error {
-	fmt.Println(parseTable[300])
+
+	stack := newStackParser()
+
+	stack.push(199)
+	stack.push(300)
+
+	fmt.Println(stack)
 	return nil
 }

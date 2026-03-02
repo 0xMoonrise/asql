@@ -1,6 +1,9 @@
 package lexer
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 type LexerErr struct {
 	Typ  int
@@ -11,9 +14,9 @@ type LexerErr struct {
 var UnknownSymbol = LexerErr{
 	Typ:  1,
 	Code: 101,
-	Desc: errors.New("unknown symbol"),
+	Desc: errors.New("Unknown symbol"),
 }
 
 func (e LexerErr) Error() string {
-	return e.Desc.Error()
+	return fmt.Sprintf("%d|%d %s", e.Typ, e.Code, e.Desc)
 }

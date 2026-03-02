@@ -2,6 +2,7 @@ package main
 
 import (
 	"asql/internal/lexer"
+	"asql/internal/parser"
 	"bufio"
 	"fmt"
 	"log"
@@ -29,13 +30,16 @@ func run() error {
 		lines = append(lines, tokens)
 	}
 
-	//Lexer: satage 1
+	// Lexer: satage 1
 	tokenStream, lexerErrors := lexer.Lexer(lines)
-	lexer.PrintLexer(tokenStream)
+	// lexer.PrintLexer(tokenStream)
 
 	for _, state := range lexerErrors {
-		fmt.Println("[Lexer]", state.Err, "line", state.Line, "token", state.L)
+		fmt.Println("[Lexer]", state.Err.Error(), "line", state.Line, "token", state.L)
 	}
+
+	// Parser: stage 2
+	parser.Parser(tokenStream)
 
 	return err
 }

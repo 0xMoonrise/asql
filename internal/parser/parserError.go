@@ -2,46 +2,51 @@ package parser
 
 import (
 	"errors"
+	"fmt"
 )
 
-type ParseErr struct {
+type parseErr struct {
 	Typ  int
 	Code int
 	Desc error
 }
 
-var ExpectKeyword = ParseErr{
+var ExpectKeyword = parseErr{
 	Typ:  2,
 	Code: 201,
 	Desc: errors.New("A keyword is expected"),
 }
 
-var ExpectIdentifier = ParseErr{
+var ExpectIdentifier = parseErr{
 	Typ:  2,
 	Code: 204,
 	Desc: errors.New("An identifier is expected"),
 }
 
-var ExpectDelimiter = ParseErr{
+var ExpectDelimiter = parseErr{
 	Typ:  2,
 	Code: 205,
 	Desc: errors.New("A delimiter is expected"),
 }
 
-var ExpectConstant = ParseErr{
+var ExpectConstant = parseErr{
 	Typ:  2,
 	Code: 206,
 	Desc: errors.New("A constant is expected"),
 }
 
-var ExpectOperator = ParseErr{
+var ExpectOperator = parseErr{
 	Typ:  2,
 	Code: 207,
 	Desc: errors.New("An operator is expected"),
 }
 
-var ExpectRelational = ParseErr{
+var ExpectRelational = parseErr{
 	Typ:  2,
 	Code: 208,
 	Desc: errors.New("A relational operator is expected"),
+}
+
+func (e parseErr) Error() string {
+	return fmt.Sprintf("%d|%d %s", e.Typ, e.Code, e.Desc)
 }
