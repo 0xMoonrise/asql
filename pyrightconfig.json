@@ -1,0 +1,8 @@
+{
+  "venvPath": "streamlit",
+  "venv": "dev",
+  "exclude": [
+    "streamlit/dev",
+    "**/__pycache__"
+  ]
+}

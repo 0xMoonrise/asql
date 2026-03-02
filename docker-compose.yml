@@ -1,4 +1,6 @@
 services:
+
+  # Asql heavy load
   asql:
     build:
       context: .
@@ -8,9 +10,11 @@ services:
       - HOST=0.0.0.0
       - PORT=8080
     networks:
-      - internal
+      internal:
+        ipv4_address: 10.10.10.2
     restart: unless-stopped
 
+  # UI server frontend
   streamlit:
     build:
       context: .
@@ -21,13 +25,15 @@ services:
       - HOME=/app
       - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
     networks:
-      - internal
+      internal:
+        ipv4_address: 10.10.10.3
     restart: unless-stopped
     depends_on:
       - asql
     volumes:
     - streamlit:/home/streamlit
 
+  # reverse proxy 
   caddy:
     image: ghcr.io/caddybuilds/caddy-cloudflare:alpine
     container_name: asql-caddy
@@ -41,8 +47,10 @@ services:
       - caddy_data:/data
       - caddy_certs:/etc/caddy/certs
     networks:
-      - internal
-      - public
+      internal:
+        ipv4_address: 10.10.10.4
+      public:
+        ipv4_address: 172.20.0.2
     restart: unless-stopped
     depends_on:
       - streamlit
@@ -53,8 +61,17 @@ volumes:
   streamlit:
 
 networks:
+
   internal:
     driver: bridge
     internal: true
+    ipam:
+      config:
+        - subnet: 10.10.10.0/29
+
   public:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+          gateway: 172.20.0.1

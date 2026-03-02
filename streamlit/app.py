@@ -5,9 +5,15 @@ import requests
 import pandas as pd
 import os
 import utils
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 app_url = os.getenv("APP_URL", "http://localhost:8080")
-
 custom_buttons = [
     {
         "name": "Run",
@@ -47,7 +53,7 @@ st.markdown("""
 response = code_editor(
     "",
     lang="sql",
-    height=[10, 30],
+    height=[5, 10], # type: ignore[arg-type]
     buttons=custom_buttons,
     options=editor_options,
     key="editor"
@@ -68,6 +74,7 @@ if response["type"] == "submit" and response["text"]:
 
         st.session_state["lexer_data"] = data
 
+        # User error module lexer level
         if "Errors" in data and data["Errors"]:
             for err in data["Errors"]:
                 st.error(f"{err}")
@@ -75,9 +82,11 @@ if response["type"] == "submit" and response["text"]:
             st.success("Query executed successfully.")
 
     except requests.exceptions.RequestException as e:
-        st.error(f"Connection error: {e}")
+        logging.error(e)
+        st.error(f"Connection error")
     except Exception as e:
-        st.error(f"Error: {e}")
+        logging.error(e)
+        st.error(f"Application error")
 
 
 tab_lexer, tab_parser, tab_semantic = st.tabs(["Lexer", "Parser", "Semantic"])
@@ -87,7 +96,6 @@ with tab_lexer:
         st.info("Run a query in the Editor tab to see the Lexer results here.")
     else:
         data = st.session_state["lexer_data"]
-
         st.subheader("Global Table")
         if "GlobalHeaders" in data and "GlobalTable" in data:
             df_global = pd.DataFrame(data["GlobalTable"],
@@ -96,8 +104,7 @@ with tab_lexer:
                 if col in df_global.columns:
                     df_global[col] = utils.safe_to_numeric(df_global[col])
             df_global.set_index('No.', inplace=True)
-            st.dataframe(df_global, width='stretch')
-
+            st.dataframe(df_global, width='stretch')            
         st.subheader("Identifiers")
         if "IdentifierHeaders" in data and "Identifiers" in data:
             df_ids = pd.DataFrame(data["Identifiers"],
@@ -107,7 +114,6 @@ with tab_lexer:
                     df_ids[col] = utils.safe_to_numeric(df_ids[col])
             df_ids.index += 1
             st.dataframe(df_ids, width='stretch')
-
         st.subheader("Constants")
         if "ConstantHeaders" in data and "Constants" in data:
             df_const = pd.DataFrame(data["Constants"],
