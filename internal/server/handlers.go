@@ -114,7 +114,7 @@ func (app *app) run(c *gin.Context) {
 	errors := []string{}
 
 	for _, err := range lexerErrors {
-		errors = append(errors, fmt.Sprintf("Line %d: %v", err.Line, err.Err))
+		errors = append(errors, fmt.Sprintf("Line %d: %v", err.Line, err.Err.Error()))
 	}
 
 	data := tableLexer(tokenStream)

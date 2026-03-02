@@ -38,7 +38,7 @@ Manually start the `asql-app` gin HTTP server
 ```sh
 make server
 ```
-you can configure the listening `port` and `host` as shown below
+You can configure the listening `port` and `host` in the `.env` file as shown below
 ```
 HOST=localhost
 PORT=9999
