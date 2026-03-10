@@ -62,6 +62,12 @@ var maxRecursionReached = parseErr{
 	Desc: errors.New("Max recursion detected, stoped"),
 }
 
+var emptyStack = parseErr{
+	Typ:  0,
+	Code: 2,
+	Desc: errors.New("No token stream was provided"),
+}
+
 func (e parseErr) Error() string {
 	return fmt.Sprintf("%d|%d %s", e.Typ, e.Code, e.Desc)
 }

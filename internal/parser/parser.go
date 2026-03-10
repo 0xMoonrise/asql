@@ -47,7 +47,9 @@ func NewParser(tokens []lexer.Token) *stackParser {
 }
 
 func (s *stackParser) Parse() *parseErr {
-
+	if len(s.stack) == 0 {
+		return &emptyStack
+	}
 	if err := s.select_expr(); err != nil {
 		return err
 	}
@@ -100,51 +102,37 @@ func (s *stackParser) select_expr() *parseErr {
 func (s *stackParser) columns_expr() *parseErr {
 	s.depth++
 	defer func() { s.depth-- }() // Infite recursion protection
-
 	if s.depth > maxRecursion {
 		return &maxRecursionReached
 	}
-
-	s.next()
-	if s.peek() == lexer.FROM {
-		return nil
-	}
-
 	if err := s.name_expr(); err != nil {
 		return err
 	}
-
 	s.next()
 	if s.peek() == lexer.FROM {
 		return nil
 	}
-
 	if err := s.expect(lexer.COMMA, expectDelimiter); err != nil {
 		return err
 	}
-
+	s.next()
 	if err := s.name_expr(); err != nil {
 		return err
 	}
-
 	return s.columns_expr()
 }
-
 func (s *stackParser) name_expr() *parseErr {
-	if s.isIdentifier() {
-		s.next()
-	}
-
-	if s.peek() == lexer.DOT {
-		s.next()
-	} else {
+	if s.peekAt(1) != lexer.DOT {
 		return nil
 	}
-
+	s.next()
+	if err := s.expect(lexer.DOT, expectDelimiter); err != nil {
+		return err
+	}
+	s.next()
 	if s.isIdentifier() {
 		return nil
 	}
-
 	return &expectIdentifier
 }
 
