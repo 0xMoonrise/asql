@@ -2,144 +2,115 @@ package parser
 
 import (
 	"asql/internal/lexer"
-	"fmt"
 )
 
-var parseTable = map[int]map[int][]int{
-	300: {
-		10: {10, 301, 11, 306, 310},
-	},
-	301: {
-		4:  {302},
-		72: {72},
-	},
-	302: {
-		4: {304, 303},
-	},
-	303: {
-		50:  {50, 302},
-		199: {},
-	},
-	304: {
-		4: {4, 305},
-	},
-	305: {
-		8:   {99},
-		10:  {99},
-		13:  {99},
-		14:  {99},
-		15:  {99},
-		50:  {51, 4},
-		51:  {51, 4},
-		53:  {99},
-		199: {99},
-	},
-	306: {
-		4: {308, 307},
-	},
-	307: {
-		50:  {50, 306},
-		99:  {},
-		199: {},
-	},
-	308: {
-		4: {4, 309},
-	},
-	309: {
-		4:   {4},
-		99:  {},
-		199: {},
-	},
-	310: {
-		12:  {12, 311},
-		199: {},
-	},
-	311: {
-		4: {313, 312},
-	},
-	312: {
-		14:  {317, 311},
-		15:  {317, 311},
-		99:  {},
-		199: {},
-	},
-	313: {
-		4: {304, 314},
-	},
-	314: {
-		8:  {315, 316},
-		13: {13, 52, 300, 53},
-	},
-	315: {
-		8: {8},
-	},
-	316: {
-		4:  {304},
-		54: {54, 318, 54},
-		61: {319},
-	},
-	317: {
-		14: {14},
-		15: {15},
-	},
-	318: {
-		62: {62},
-	},
-	319: {
-		61: {61},
-	},
-}
-
-// Start
-// Push('$')              ->  stack := []int{199, 300}
-// Push(300)
-// Append '$' to the end of the Token Table
-// PTR = Pointer to the first Token in the Token Table  ->  pos := 0
-// Repeat
-//     X = Pop()                          ->  top := stack[len(stack)-1]
-//     K = TokenTable[PTR]                ->  cur := input[pos]
-//
-//     If (X = TERMINAL) or (X = '$') then
-//         If (X = K) then
-//             Advance PTR                ->  pos++  and  pop stack
-//         Else
-//             ERROR()                    ->  unexpected token, X != K
-//
-//     Else
-//         If (ParseTable[X,K] = PRODUCTION) then
-//             If (PRODUCTION <> 'λ') then
-//                 Push(PRODUCTION) in reverse order
-//         Else
-//             ERROR()                    ->  empty cell in parse table
-//
-// Until X = '$'
-// End
+const EOF = -1
 
 type stackParser struct {
-	top   int
 	ptr   int
-	stack []int
+	stack []lexer.Token
 }
 
-func (s *stackParser) push(value int) {
-	s.stack = append(s.stack, value)
+func (s *stackParser) expect(value lexer.Value, err parseErr) *parseErr {
+	token := s.stack[s.ptr]
+	if token.V == value {
+		return nil
+	}
+	err.Token = token
+	return &err
 }
 
-func newStackParser() *stackParser {
+func (s *stackParser) peek() lexer.Value {
+	return s.stack[s.ptr].V
+}
+
+func (s *stackParser) next() lexer.Value {
+	if s.ptr+1 < len(s.stack) {
+		s.ptr++
+		return s.stack[s.ptr].V
+	}
+	return EOF
+}
+
+func NewParser(tokens []lexer.Token) *stackParser {
 	return &stackParser{
-		top:   1,
 		ptr:   0,
-		stack: []int{},
+		stack: tokens,
 	}
 }
 
-func Parser(tokenStream []lexer.Token) error {
+func (s *stackParser) Parse() *parseErr {
 
-	stack := newStackParser()
+	if err := s.select_expr(); err != nil {
+		return err
+	}
 
-	stack.push(199)
-	stack.push(300)
+	if err := s.from_expr(); err != nil {
+		return err
+	}
 
-	fmt.Println(stack)
+	return nil
+}
+
+// SELECT_EXPR  := SELECT * FROM_EXPR | SELECT COLUMNS_EXPR FROM_EXPR
+// COLUMNS_EXPR := NAME_EXPR | NAME_EXPR , COLUMNS_EXPR
+// NAME_EXPR    := IDENTIFIER | IDENTIFIER . IDENTIFIER
+// FROM_EXPR    := FROM NAME_EXPR | FROM NAME_EXPR WHERE_CLAUSE
+// WHERE_CLAUSE := WHERE COLUMN_EXPR OPERATOR CONSTANT
+// OPERATOR     := = | < | <= | > | >= | <>
+
+func (s *stackParser) select_expr() *parseErr {
+	if err := s.expect(lexer.SELECT, expectKeyword); err != nil {
+		return err
+	}
+
+	s.next()
+	terminal := s.peek()
+
+	switch {
+	case terminal == lexer.TIMES:
+		s.next()
+	case terminal > 400 && terminal < 600:
+		return s.name_expr()
+	default:
+		return &expectedColOrStar
+	}
+
+	return nil
+}
+
+var cycle = 0
+
+const maxRecursion = 10
+
+func (s *stackParser) name_expr() *parseErr {
+
+	if cycle > maxRecursion {
+		return &maxRecursionReached
+	}
+	cycle++
+
+	s.next()
+	if s.peek() == lexer.FROM {
+		return nil
+	}
+
+	if err := s.expect(lexer.COMMA, expectDelimiter); err != nil {
+		return err
+	}
+
+	s.next()
+	if !(s.peek() > 400 && s.peek() < 600) {
+		return &expectIdentifier
+	}
+
+	return s.name_expr()
+}
+
+func (s *stackParser) from_expr() *parseErr {
+	if err := s.expect(lexer.FROM, expectKeyword); err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -9,9 +9,9 @@ import (
 )
 
 type Token struct {
-	L    lexeme
-	V    value
-	T    typ
+	L    Lexeme
+	V    Value
+	T    Typ
 	Line int
 }
 
@@ -27,43 +27,43 @@ func NewTable() lexer {
 
 	Tokens := []Token{
 		// keywords (1)
-		{L: "SELECT", V: __select, T: 1},
-		{L: "FROM", V: __from, T: 1},
-		{L: "WHERE", V: __where, T: 1},
-		{L: "IN", V: __in, T: 1},
-		{L: "AND", V: __and, T: 1},
-		{L: "OR", V: __or, T: 1},
-		{L: "CREATE", V: __create, T: 1},
-		{L: "TABLE", V: __table, T: 1},
-		{L: "CHAR", V: __char, T: 1},
-		{L: "NUMERIC", V: __numeric, T: 1},
-		{L: "NOT", V: __not, T: 1},
-		{L: "NULL", V: __null, T: 1},
-		{L: "CONSTRAINT", V: __constraint, T: 1},
-		{L: "KEY", V: __key, T: 1},
-		{L: "PRIMARY", V: __primary, T: 1},
-		{L: "FOREIGN", V: __foreign, T: 1},
-		{L: "REFERENCES", V: __references, T: 1},
-		{L: "INSERT", V: __insert, T: 1},
-		{L: "INTO", V: __into, T: 1},
-		{L: "VALUES", V: __values, T: 1},
+		{L: "SELECT", V: SELECT, T: 1},
+		{L: "FROM", V: FROM, T: 1},
+		{L: "WHERE", V: WHERE, T: 1},
+		{L: "IN", V: IN, T: 1},
+		{L: "AND", V: AND, T: 1},
+		{L: "OR", V: OR, T: 1},
+		{L: "CREATE", V: CREATE, T: 1},
+		{L: "TABLE", V: TABLE, T: 1},
+		{L: "CHAR", V: CHAR, T: 1},
+		{L: "NUMERIC", V: NUMER, T: 1},
+		{L: "NOT", V: NOT, T: 1},
+		{L: "NULL", V: NULL, T: 1},
+		{L: "CONSTRAINT", V: CONSTRAIN, T: 1},
+		{L: "KEY", V: KEY, T: 1},
+		{L: "PRIMARY", V: PRIMARY, T: 1},
+		{L: "FOREIGN", V: FOREIGN, T: 1},
+		{L: "REFERENCES", V: REFERENCES, T: 1},
+		{L: "INSERT", V: INSERT, T: 1},
+		{L: "INTO", V: INTO, T: 1},
+		{L: "VALUES", V: VALUES, T: 1},
 		// delimitators (5)
-		{L: ",", V: comma, T: 5},
-		{L: ".", V: dot, T: 5},
-		{L: "(", V: lparentheses, T: 5},
-		{L: ")", V: rparentheses, T: 5},
-		{L: "'", V: apostrophe, T: 5},
+		{L: ",", V: COMMA, T: 5},
+		{L: ".", V: DOT, T: 5},
+		{L: "(", V: LPAR, T: 5},
+		{L: ")", V: RPAR, T: 5},
+		{L: "'", V: APOS, T: 5},
 		// Operators (7)
-		{L: "+", V: plus, T: 7},
-		{L: "-", V: minus, T: 7},
-		{L: "*", V: times, T: 7},
-		{L: "/", V: divition, T: 7},
+		{L: "+", V: PLUS, T: 7},
+		{L: "-", V: MINUS, T: 7},
+		{L: "*", V: TIMES, T: 7},
+		{L: "/", V: DIVS, T: 7},
 		// Relations (8)
-		{L: ">", V: gt, T: 8},
-		{L: "<", V: lt, T: 8},
-		{L: "=", V: eq, T: 8},
-		{L: ">=", V: ge, T: 8},
-		{L: "<=", V: le, T: 8},
+		{L: ">", V: GT, T: 8},
+		{L: "<", V: LT, T: 8},
+		{L: "=", V: EQ, T: 8},
+		{L: ">=", V: GE, T: 8},
+		{L: "<=", V: LE, T: 8},
 	}
 
 	for _, token := range Tokens {
@@ -144,18 +144,18 @@ func lexerTable() func(t string) (Token, error) {
 		// and then it could be a non-lexical character
 		// or a valid identifier/constant
 		token := Token{}
-		token.L = lexeme(t)
+		token.L = Lexeme(t)
 
 		switch {
 		case reConst.MatchString(t):
 			token.T = 6
-			token.V = value(constants)
+			token.V = Value(constants)
 			constants++
 			cache[t] = token
 			return token, nil
 		case reKws.MatchString(t):
 			token.T = 4
-			token.V = value(indentifiers)
+			token.V = Value(indentifiers)
 			indentifiers++
 			cache[t] = token
 			return token, nil
@@ -182,7 +182,7 @@ func (c *TokenStream) GenTokenStream() iter.Seq2[int, TokenResult] {
 }
 
 type ErrorState struct {
-	L    lexeme
+	L    Lexeme
 	Err  error
 	Line int
 }

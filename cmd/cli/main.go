@@ -3,32 +3,18 @@ package main
 import (
 	"asql/internal/lexer"
 	"asql/internal/parser"
-	"bufio"
 	"fmt"
 	"log"
-	"strings"
 )
 
 func run() error {
 
-	lines := [][]string{}
 	reader, err := readFile()
 	if err != nil {
 		return err
 	}
 
-	defer reader.Close()
-	buffer := bufio.NewScanner(reader)
-
-	for buffer.Scan() {
-		rawText := buffer.Text()
-		if strings.HasPrefix(rawText, "#") { // Check special cace for shebang #!
-			continue
-		}
-
-		tokens := lexer.Tokenize(rawText)
-		lines = append(lines, tokens)
-	}
+	lines := readFromFile(reader)
 
 	// Lexer: satage 1
 	tokenStream, lexerErrors := lexer.Lexer(lines)
@@ -39,8 +25,15 @@ func run() error {
 	}
 
 	// Parser: stage 2
-	parser.Parser(tokenStream)
-
+	// parser.Parser(tokenStream)
+	p := parser.NewParser(tokenStream)
+	state := p.Parse()
+	if state != nil {
+		fmt.Println("[Parser]", state.Error(),
+			"line: ", state.Token.Line,
+			"Token:", state.Token.L,
+			"Value:", state.Token.V)
+	}
 	return err
 }
 

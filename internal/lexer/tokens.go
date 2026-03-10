@@ -1,61 +1,63 @@
 package lexer
 
-type lexeme string
-type value int
-type typ int
+type Lexeme string
+type Value int
+type Typ int
 
 // keywords
 const (
-	__select = iota + 10
-	__from
-	__where
-	__in
-	__and
-	__or
-	__create
-	__table
-	__char
-	__numeric
-	__not
-	__null
-	__constraint
-	__key
-	__primary
-	__foreign
-	__references
-	__insert
-	__into
-	__values
+	SELECT = iota + 10
+	FROM
+	WHERE
+	IN
+	AND
+	OR
+	CREATE
+	TABLE
+	CHAR
+	NUMERIC
+	NOT
+	NULL
+	CONSTRAIN
+	KEY
+	PRIMARY
+	//foreign
+	FOREIGN
+	//references
+	REFERENCES
+	INSERT
+	INTO
+	VALUES
 )
 
 // delimitators
 const (
-	comma = iota + 50
-	dot
-	lparentheses
-	rparentheses
-	apostrophe
+	COMMA = iota + 50
+	DOT
+	LPAR
+	RPAR
+	APOS
 )
 
 // operators
 const (
-	plus = iota + 70
-	minus
-	times
-	divition
+	PLUS = iota + 70
+	MINUS
+	TIMES
+	DIVS
 )
 
 // constants
 const (
-	numeric = iota + 61
-	alpha
+	NUMER = iota + 61
+	ALPHA
 )
 
 // relations
 const (
-	gt = iota + 81
-	lt
-	eq
-	ge
-	le
+	GT = iota + 81
+	LT
+	EQ
+	GE
+	LE
 )
