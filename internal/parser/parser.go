@@ -5,9 +5,11 @@ import (
 )
 
 const EOF = -1
+const maxRecursion = 10
 
 type stackParser struct {
 	ptr   int
+	depth int
 	stack []lexer.Token
 }
 
@@ -24,6 +26,10 @@ func (s *stackParser) peek() lexer.Value {
 	return s.stack[s.ptr].V
 }
 
+func (s *stackParser) peekAt(position int) lexer.Value {
+	return s.stack[s.ptr+position].V
+}
+
 func (s *stackParser) next() lexer.Value {
 	if s.ptr+1 < len(s.stack) {
 		s.ptr++
@@ -35,6 +41,7 @@ func (s *stackParser) next() lexer.Value {
 func NewParser(tokens []lexer.Token) *stackParser {
 	return &stackParser{
 		ptr:   0,
+		depth: 0,
 		stack: tokens,
 	}
 }
@@ -59,6 +66,17 @@ func (s *stackParser) Parse() *parseErr {
 // WHERE_CLAUSE := WHERE COLUMN_EXPR OPERATOR CONSTANT
 // OPERATOR     := = | < | <= | > | >= | <>
 
+func safeRecursion(f func()) *parseErr {
+	var cycle = 0
+	const maxRecursion = 10
+	if cycle > maxRecursion {
+		return &maxRecursionReached
+	}
+	f()
+	cycle++
+	return nil
+}
+
 func (s *stackParser) select_expr() *parseErr {
 	if err := s.expect(lexer.SELECT, expectKeyword); err != nil {
 		return err
@@ -66,12 +84,11 @@ func (s *stackParser) select_expr() *parseErr {
 
 	s.next()
 	terminal := s.peek()
-
 	switch {
 	case terminal == lexer.TIMES:
 		s.next()
 	case terminal > 400 && terminal < 600:
-		return s.name_expr()
+		return s.columns_expr()
 	default:
 		return &expectedColOrStar
 	}
@@ -79,16 +96,23 @@ func (s *stackParser) select_expr() *parseErr {
 	return nil
 }
 
-var cycle = 0
+// columns_expr: ptr must point to the first identifier on entry
+func (s *stackParser) columns_expr() *parseErr {
+	s.depth++
+	defer func() { s.depth-- }() // Infite recursion protection
 
-const maxRecursion = 10
-
-func (s *stackParser) name_expr() *parseErr {
-
-	if cycle > maxRecursion {
+	if s.depth > maxRecursion {
 		return &maxRecursionReached
 	}
-	cycle++
+
+	s.next()
+	if s.peek() == lexer.FROM {
+		return nil
+	}
+
+	if err := s.name_expr(); err != nil {
+		return err
+	}
 
 	s.next()
 	if s.peek() == lexer.FROM {
@@ -99,12 +123,34 @@ func (s *stackParser) name_expr() *parseErr {
 		return err
 	}
 
-	s.next()
-	if !(s.peek() > 400 && s.peek() < 600) {
-		return &expectIdentifier
+	if err := s.name_expr(); err != nil {
+		return err
 	}
 
-	return s.name_expr()
+	return s.columns_expr()
+}
+
+func (s *stackParser) name_expr() *parseErr {
+	if s.isIdentifier() {
+		s.next()
+	}
+
+	if s.peek() == lexer.DOT {
+		s.next()
+	} else {
+		return nil
+	}
+
+	if s.isIdentifier() {
+		return nil
+	}
+
+	return &expectIdentifier
+}
+
+func (s *stackParser) isIdentifier() bool {
+	terminal := s.peek()
+	return (terminal > 400 && terminal < 600)
 }
 
 func (s *stackParser) from_expr() *parseErr {

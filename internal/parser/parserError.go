@@ -55,8 +55,9 @@ var expectRelational = parseErr{
 	Desc: errors.New("A relational operator is expected"),
 }
 
+// Type 0 kernel error
 var maxRecursionReached = parseErr{
-	Typ:  -1,
+	Typ:  0,
 	Code: 1,
 	Desc: errors.New("Max recursion detected, stoped"),
 }
