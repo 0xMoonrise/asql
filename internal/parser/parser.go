@@ -68,17 +68,6 @@ func (s *stackParser) Parse() *parseErr {
 // WHERE_CLAUSE := WHERE COLUMN_EXPR OPERATOR CONSTANT
 // OPERATOR     := = | < | <= | > | >= | <>
 
-func safeRecursion(f func()) *parseErr {
-	var cycle = 0
-	const maxRecursion = 10
-	if cycle > maxRecursion {
-		return &maxRecursionReached
-	}
-	f()
-	cycle++
-	return nil
-}
-
 func (s *stackParser) select_expr() *parseErr {
 	if err := s.expect(lexer.SELECT, expectKeyword); err != nil {
 		return err
@@ -89,7 +78,7 @@ func (s *stackParser) select_expr() *parseErr {
 	switch {
 	case terminal == lexer.TIMES:
 		s.next()
-	case terminal > 400 && terminal < 600:
+	case s.isIdentifier():
 		return s.columns_expr()
 	default:
 		return &expectedColOrStar
@@ -105,35 +94,55 @@ func (s *stackParser) columns_expr() *parseErr {
 	if s.depth > maxRecursion {
 		return &maxRecursionReached
 	}
+
 	if err := s.name_expr(); err != nil {
 		return err
 	}
+
 	s.next()
+
 	if s.peek() == lexer.FROM {
 		return nil
 	}
+
 	if err := s.expect(lexer.COMMA, expectDelimiter); err != nil {
 		return err
 	}
+
 	s.next()
+
 	if err := s.name_expr(); err != nil {
 		return err
 	}
+
 	return s.columns_expr()
 }
+
 func (s *stackParser) name_expr() *parseErr {
+	if !s.isIdentifier() {
+		return &expectIdentifier
+	}
+
 	if s.peekAt(1) != lexer.DOT {
 		return nil
 	}
+
 	s.next()
 	if err := s.expect(lexer.DOT, expectDelimiter); err != nil {
 		return err
 	}
+
 	s.next()
-	if s.isIdentifier() {
-		return nil
+	if !s.isIdentifier() {
+		return &expectIdentifier
 	}
-	return &expectIdentifier
+
+	//case a.b.c is not expected
+	if s.peekAt(1) == lexer.DOT {
+		return &expectDelimiter
+	}
+
+	return nil
 }
 
 func (s *stackParser) isIdentifier() bool {

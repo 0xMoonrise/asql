@@ -1,5 +1,6 @@
 ENTRY=./cmd/cli
 TARGET=asql
+RUN ?= .
 
 all:
 	go run $(ENTRY) -f code.asql
@@ -10,11 +11,14 @@ build:
 clean:
 	rm $(TARGET)
 
-test:
-	go test ./...
-
 server:
 	go run ./cmd/server
 
 cli:
 	go run $(ENTRY)
+
+debug:
+	dlv debug $(ENTRY) -- -f code.asql
+
+test:
+	gotestsum --format testname -- -run $(RUN) ./...
