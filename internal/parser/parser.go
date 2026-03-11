@@ -22,10 +22,6 @@ func (s *stackParser) expect(value lexer.Value, err parseErr) *parseErr {
 	return &err
 }
 
-func (s *stackParser) peek() lexer.Value {
-	return s.stack[s.ptr].V
-}
-
 func (s *stackParser) peekAt(position int) lexer.Value {
 	return s.stack[s.ptr+position].V
 }
@@ -38,18 +34,30 @@ func (s *stackParser) next() lexer.Value {
 	return EOF
 }
 
+func (s *stackParser) tokenAt(position int) lexer.Token {
+	return s.stack[s.ptr+position]
+}
+
+func (s *stackParser) isIdentifier() bool {
+	terminal := s.peekAt(0)
+	return (terminal > 400 && terminal < 600)
+}
+
 func NewParser(tokens []lexer.Token) *stackParser {
-	return &stackParser{
+	p := &stackParser{
 		ptr:   0,
 		depth: 0,
 		stack: tokens,
 	}
+	return p
 }
 
 func (s *stackParser) Parse() *parseErr {
+
 	if len(s.stack) == 0 {
 		return &emptyStack
 	}
+
 	if err := s.select_expr(); err != nil {
 		return err
 	}
@@ -61,20 +69,28 @@ func (s *stackParser) Parse() *parseErr {
 	return nil
 }
 
-// SELECT_EXPR  := SELECT * FROM_EXPR | SELECT COLUMNS_EXPR FROM_EXPR
-// COLUMNS_EXPR := NAME_EXPR | NAME_EXPR , COLUMNS_EXPR
-// NAME_EXPR    := IDENTIFIER | IDENTIFIER . IDENTIFIER
-// FROM_EXPR    := FROM NAME_EXPR | FROM NAME_EXPR WHERE_CLAUSE
-// WHERE_CLAUSE := WHERE COLUMN_EXPR OPERATOR CONSTANT
-// OPERATOR     := = | < | <= | > | >= | <>
+func (s *stackParser) safeRecursion() *parseErr {
+	s.depth++
+	if s.depth > maxRecursion {
+		return &maxRecursionReached
+	}
+	return nil
+}
 
+func (s *stackParser) unwind() {
+	s.depth--
+}
+
+// SELECT_EXPR  := SELECT * FROM_EXPR | SELECT COLUMNS_EXPR FROM_EXPR
 func (s *stackParser) select_expr() *parseErr {
+
 	if err := s.expect(lexer.SELECT, expectKeyword); err != nil {
 		return err
 	}
 
 	s.next()
-	terminal := s.peek()
+	terminal := s.peekAt(0)
+
 	switch {
 	case terminal == lexer.TIMES:
 		s.next()
@@ -88,12 +104,14 @@ func (s *stackParser) select_expr() *parseErr {
 }
 
 // columns_expr: ptr must point to the first identifier on entry
+// COLUMNS_EXPR := NAME_EXPR | NAME_EXPR , COLUMNS_EXPR
 func (s *stackParser) columns_expr() *parseErr {
-	s.depth++
-	defer func() { s.depth-- }() // Infite recursion protection
-	if s.depth > maxRecursion {
-		return &maxRecursionReached
+
+	if err := s.safeRecursion(); err != nil {
+		return err
 	}
+
+	defer s.unwind()
 
 	if err := s.name_expr(); err != nil {
 		return err
@@ -101,7 +119,7 @@ func (s *stackParser) columns_expr() *parseErr {
 
 	s.next()
 
-	if s.peek() == lexer.FROM {
+	if s.peekAt(0) == lexer.FROM {
 		return nil
 	}
 
@@ -118,6 +136,7 @@ func (s *stackParser) columns_expr() *parseErr {
 	return s.columns_expr()
 }
 
+// NAME_EXPR    := IDENTIFIER | IDENTIFIER . IDENTIFIER
 func (s *stackParser) name_expr() *parseErr {
 	if !s.isIdentifier() {
 		return &expectIdentifier
@@ -145,11 +164,7 @@ func (s *stackParser) name_expr() *parseErr {
 	return nil
 }
 
-func (s *stackParser) isIdentifier() bool {
-	terminal := s.peek()
-	return (terminal > 400 && terminal < 600)
-}
-
+// FROM_EXPR    := FROM NAME_EXPR | FROM NAME_EXPR WHERE_CLAUSE
 func (s *stackParser) from_expr() *parseErr {
 	if err := s.expect(lexer.FROM, expectKeyword); err != nil {
 		return err
@@ -157,3 +172,6 @@ func (s *stackParser) from_expr() *parseErr {
 
 	return nil
 }
+
+// WHERE_CLAUSE := WHERE COLUMN_EXPR OPERATOR CONSTANT
+// OPERATOR     := = | < | <= | > | >= | <>
