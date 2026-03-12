@@ -23,7 +23,10 @@ func (s *stackParser) expect(value lexer.Value, err parseErr) *parseErr {
 }
 
 func (s *stackParser) peekAt(position int) lexer.Value {
-	return s.stack[s.ptr+position].V
+	if s.ptr+position < len(s.stack) {
+		return s.stack[s.ptr+position].V
+	}
+	return EOF
 }
 
 func (s *stackParser) next() lexer.Value {
@@ -170,8 +173,53 @@ func (s *stackParser) from_expr() *parseErr {
 		return err
 	}
 
+	s.next()
+
+	if err := s.databases_expr(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
+// DATABASES_EXPR := NAME_EXPR | NAME_EXPR , DATABASES_EXPR
+func (s *stackParser) databases_expr() *parseErr {
+
+	if err := s.safeRecursion(); err != nil {
+		return err
+	}
+
+	defer s.unwind()
+
+	if err := s.name_expr(); err != nil {
+		return err
+	}
+
+	if terminal := s.next(); terminal == EOF {
+		return nil
+	}
+
+	if err := s.expect(lexer.COMMA, expectDelimiter); err != nil {
+		return err
+	}
+
+	s.next()
+
+	if err := s.name_expr(); err != nil {
+		return err
+	}
+
+	if s.peekAt(0) == EOF {
+		return nil
+	}
+
+	return s.databases_expr()
+}
+
 // WHERE_CLAUSE := WHERE COLUMN_EXPR OPERATOR CONSTANT
+func (s *stackParser) where_clause() *parseErr {
+
+	return nil
+}
+
 // OPERATOR     := = | < | <= | > | >= | <>
