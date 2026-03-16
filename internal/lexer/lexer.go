@@ -1,11 +1,12 @@
 package lexer
 
 import (
-	"asql/internal/utils"
 	"errors"
 	"iter"
 	"regexp"
 	"strings"
+
+	"github.com/0xMoonrise/asql/internal/utils"
 )
 
 type Token struct {
@@ -64,6 +65,7 @@ func NewTable() lexer {
 		{L: "=", V: EQ, T: 8},
 		{L: ">=", V: GE, T: 8},
 		{L: "<=", V: LE, T: 8},
+		{L: "<>", V: NE, T: 8},
 	}
 
 	for _, token := range Tokens {

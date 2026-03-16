@@ -1,10 +1,11 @@
 package main
 
 import (
-	"asql/internal/lexer"
 	"bufio"
 	"io"
 	"strings"
+
+	"github.com/0xMoonrise/asql/internal/lexer"
 )
 
 func readFromFile(reader io.ReadCloser) (lines [][]string) {

@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"asql/internal/lexer"
+	"github.com/0xMoonrise/asql/internal/lexer"
 )
 
 const EOF = -1
@@ -14,11 +14,9 @@ type stackParser struct {
 }
 
 func (s *stackParser) expect(value lexer.Value, err parseErr) *parseErr {
-	token := s.stack[s.ptr]
-	if token.V == value {
+	if s.stack[s.ptr].V == value {
 		return nil
 	}
-	err.Token = token
 	return &err
 }
 
@@ -46,6 +44,14 @@ func (s *stackParser) isIdentifier() bool {
 	return (terminal > 400 && terminal < 600)
 }
 
+func (s *stackParser) isRelation() bool {
+	return s.tokenAt(0).T == 8
+}
+
+func (s *stackParser) isConstant() bool {
+	return s.peekAt(0) >= 600
+}
+
 func NewParser(tokens []lexer.Token) *stackParser {
 	p := &stackParser{
 		ptr:   0,
@@ -66,6 +72,14 @@ func (s *stackParser) Parse() *parseErr {
 	}
 
 	if err := s.from_expr(); err != nil {
+		return err
+	}
+
+	if s.peekAt(0) != lexer.WHERE {
+		return nil
+	}
+
+	if err := s.where_clause(); err != nil {
 		return err
 	}
 
@@ -139,17 +153,22 @@ func (s *stackParser) columns_expr() *parseErr {
 	return s.columns_expr()
 }
 
-// NAME_EXPR    := IDENTIFIER | IDENTIFIER . IDENTIFIER
+// NAME_EXPR := IDENTIFIER | IDENTIFIER . IDENTIFIER
+// This piece of code is not a pure LL1, because is simplier
+// to implement a LL(k) grammar, taking the correct branch
+// in case of ambiguity
 func (s *stackParser) name_expr() *parseErr {
 	if !s.isIdentifier() {
 		return &expectIdentifier
 	}
 
+	// LL2
 	if s.peekAt(1) != lexer.DOT {
 		return nil
 	}
 
 	s.next()
+	// is always true just to clarify the sintax of the production
 	if err := s.expect(lexer.DOT, expectDelimiter); err != nil {
 		return err
 	}
@@ -159,7 +178,9 @@ func (s *stackParser) name_expr() *parseErr {
 		return &expectIdentifier
 	}
 
-	//case a.b.c is not expected
+	// case a.b.c is not expected, this solves the issue
+	// with the ambiguity of LL1 just because looking at 2 tokens
+	// transforming the grammar to LL2
 	if s.peekAt(1) == lexer.DOT {
 		return &expectDelimiter
 	}
@@ -195,7 +216,7 @@ func (s *stackParser) databases_expr() *parseErr {
 		return err
 	}
 
-	if terminal := s.next(); terminal == EOF {
+	if terminal := s.next(); terminal == EOF || terminal == lexer.WHERE {
 		return nil
 	}
 
@@ -209,17 +230,44 @@ func (s *stackParser) databases_expr() *parseErr {
 		return err
 	}
 
-	if s.peekAt(0) == EOF {
+	terminal := s.peekAt(0)
+	if terminal == EOF || terminal == lexer.WHERE {
 		return nil
 	}
 
 	return s.databases_expr()
 }
 
-// WHERE_CLAUSE := WHERE COLUMN_EXPR OPERATOR CONSTANT
+// WHERE_CLAUSE := WHERE CONDITION STMT
+// STMT         := AND CONDITION STMT | OR CONDITION STMT |  λ
 func (s *stackParser) where_clause() *parseErr {
+
+	if err := s.expect(lexer.WHERE, expectKeyword); err != nil {
+		return err
+	}
+
+	s.next()
+	if !s.isIdentifier() {
+		return &expectIdentifier
+	}
+
+	s.next()
+	if err := s.relation_expr(); err != nil {
+		return err
+	}
+
+	s.next()
+	if !s.isConstant() {
+		return &expectConstant
+	}
 
 	return nil
 }
 
-// OPERATOR     := = | < | <= | > | >= | <>
+// RELATION := = | < | <= | > | >= | <>
+func (s *stackParser) relation_expr() *parseErr {
+	if !s.isRelation() {
+		return &expectRelational
+	}
+	return nil
+}

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"asql/internal/lexer"
-	"asql/internal/parser"
 	"fmt"
+	"github.com/0xMoonrise/asql/internal/lexer"
+	"github.com/0xMoonrise/asql/internal/parser"
 	"log"
 )
 
@@ -14,10 +14,10 @@ func run() error {
 		return err
 	}
 
-	lines := readFromFile(reader)
+	source := readFromFile(reader)
 
 	// Lexer: satage 1
-	tokenStream, lexerErrors := lexer.Lexer(lines)
+	tokenStream, lexerErrors := lexer.Lexer(source)
 	// lexer.PrintLexer(tokenStream)
 
 	for _, state := range lexerErrors {
@@ -25,14 +25,9 @@ func run() error {
 	}
 
 	// Parser: stage 2
-	// parser.Parser(tokenStream)
-	p := parser.NewParser(tokenStream)
-	state := p.Parse()
+	state := parser.NewParser(tokenStream).Parse()
 	if state != nil {
-		fmt.Println("[Parser]", state.Error(),
-			"line: ", state.Token.Line,
-			"Token:", state.Token.L,
-			"Value:", state.Token.V)
+		fmt.Println("[Parser]", state.Error())
 	}
 	return err
 }

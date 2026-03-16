@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"asql/internal/lexer"
+	"github.com/0xMoonrise/asql/internal/lexer"
 	"github.com/gin-gonic/gin"
 )
 

@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"asql/internal/lexer"
 	"testing"
 
+	"github.com/0xMoonrise/asql/internal/lexer"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -102,6 +102,13 @@ func TestErrorCodes(t *testing.T) {
 
 	t.Run("over-qualified column returns 205", func(t *testing.T) {
 		err := parse("SELECT a.b.c FROM foo")
+		assert.NotNil(t, err)
+		assert.Equal(t, 205, err.Code,
+			"should return error 205 (delimiter expected)")
+	})
+
+	t.Run("trailing comma and over-qualified column returns 205", func(t *testing.T) {
+		err := parse("SELECT a, a.b.c FROM foo")
 		assert.NotNil(t, err)
 		assert.Equal(t, 205, err.Code,
 			"should return error 205 (delimiter expected)")

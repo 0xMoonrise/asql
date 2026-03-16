@@ -60,4 +60,5 @@ const (
 	EQ
 	GE
 	LE
+	NE
 )

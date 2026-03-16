@@ -1,11 +1,11 @@
 package main
 
 import (
-	"asql/internal/server"
 	"log"
 	"log/slog"
 	"os"
 
+	"github.com/0xMoonrise/asql/internal/server"
 	"github.com/joho/godotenv"
 )
 

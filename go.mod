@@ -1,4 +1,4 @@
-module asql
+module github.com/0xMoonrise/asql
 
 go 1.25.2
 
