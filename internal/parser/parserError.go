@@ -65,6 +65,12 @@ var unexpectedToken = parseErr{
 	Err:  errors.New("Unexpcted token"),
 }
 
+var expectedConstOrIdent = parseErr{
+	Typ:  2,
+	Code: 210,
+	Err:  errors.New("expected a constant or identifier"),
+}
+
 // Type 0 kernel error
 var maxRecursionReached = parseErr{
 	Typ:  0,

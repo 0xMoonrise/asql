@@ -1,10 +1,13 @@
 package parser
 
 import (
+	"fmt"
+
 	"github.com/0xMoonrise/asql/internal/lexer"
 )
 
 const EOF = -1
+const DEBUG = false
 const maxRecursion = 10
 
 type stackParser struct {
@@ -99,7 +102,13 @@ func (s *stackParser) Parse() *parseErr {
 		return &emptyStack
 	}
 
+	if DEBUG == true {
+		for i, t := range s.stack {
+			fmt.Printf("[%d] L=%s V=%d T=%d\n", i, t.L, t.V, t.T)
+		}
+	}
 	if err := s.dml_expr(); err != nil {
+		fmt.Printf("failed at ptr=%d token=%v\n", s.ptr, s.stack[s.ptr])
 		return err
 	}
 
@@ -164,33 +173,29 @@ func (s *stackParser) select_expr() *parseErr {
 // COLUMNS_EXPR := NAME_EXPR | NAME_EXPR , COLUMNS_EXPR
 func (s *stackParser) columns_expr() *parseErr {
 
-	if err := s.safeRecursion(); err != nil {
-		return err
-	}
-
-	defer s.unwind()
-
 	if err := s.name_expr(); err != nil {
 		return err
 	}
 
 	s.next()
 
-	if s.peekAt(0) == lexer.FROM {
-		return nil
+	for {
+		if s.peekAt(0) == lexer.FROM {
+			return nil
+		}
+
+		if err := s.expect(lexer.COMMA, expectDelimiter); err != nil {
+			return err
+		}
+
+		s.next()
+
+		if err := s.name_expr(); err != nil {
+			return err
+		}
+
+		s.next()
 	}
-
-	if err := s.expect(lexer.COMMA, expectDelimiter); err != nil {
-		return err
-	}
-
-	s.next()
-
-	if err := s.name_expr(); err != nil {
-		return err
-	}
-
-	return s.columns_expr()
 }
 
 // NAME_EXPR := IDENTIFIER | IDENTIFIER . IDENTIFIER
@@ -243,39 +248,87 @@ func (s *stackParser) from_expr() *parseErr {
 	return nil
 }
 
-// DATABASES_EXPR := NAME_EXPR | NAME_EXPR , DATABASES_EXPR
+// DATABASES_EXPR := TABLE_EXPR | TABLE_EXPR , DATABASES_EXPR
 func (s *stackParser) databases_expr() *parseErr {
-
 	if err := s.safeRecursion(); err != nil {
 		return err
 	}
-
 	defer s.unwind()
 
+	if err := s.table_expr(); err != nil {
+		return err
+	}
+
+	for {
+		terminal := s.peekAt(0)
+		if terminal == EOF || terminal == lexer.WHERE || terminal == lexer.RPAR {
+			return nil
+		}
+		if s.isIdentifier() {
+			return nil
+		}
+
+		if err := s.expect(lexer.COMMA, expectDelimiter); err != nil {
+			return err
+		}
+
+		s.next()
+
+		if err := s.table_expr(); err != nil {
+			return err
+		}
+	}
+}
+
+// TABLE_EXPR := NAME_EXPR [ALIAS] | ( DML_EXPR ) ALIAS
+func (s *stackParser) table_expr() *parseErr {
+
+	if s.peekAt(0) == lexer.LPAR {
+		if err := s.pushParStack(); err != nil {
+			return err
+		}
+		if err := s.dml_expr(); err != nil {
+			return err
+		}
+		if err := s.popParStack(); err != nil {
+			return err
+		}
+		if !s.isIdentifier() {
+			return &expectIdentifier
+		}
+		if next := s.next(); next == EOF {
+			return nil
+		}
+		return s.expectTableTerminator()
+	}
+
 	if err := s.name_expr(); err != nil {
 		return err
 	}
 
-	if terminal := s.next(); terminal == EOF || terminal == lexer.WHERE || terminal == lexer.RPAR {
+	if next := s.next(); next == EOF {
 		return nil
 	}
 
-	if err := s.expect(lexer.COMMA, expectDelimiter); err != nil {
-		return err
+	if s.isIdentifier() {
+		if next := s.next(); next == EOF {
+			return nil
+		}
+		return s.expectTableTerminator()
 	}
 
-	s.next()
+	return nil
+}
 
-	if err := s.name_expr(); err != nil {
-		return err
-	}
-
+func (s *stackParser) expectTableTerminator() *parseErr {
 	terminal := s.peekAt(0)
-	if terminal == EOF || terminal == lexer.WHERE {
+	if terminal == EOF ||
+		terminal == lexer.WHERE ||
+		terminal == lexer.RPAR ||
+		terminal == lexer.COMMA {
 		return nil
 	}
-
-	return s.databases_expr()
+	return &unexpectedToken
 }
 
 // WHERE_CLAUSE := WHERE CONDITION STMT
@@ -316,8 +369,14 @@ func (s *stackParser) condition_expr() *parseErr {
 	}
 
 	s.next()
-	if !s.isConstant() {
-		return &expectConstant
+	switch {
+	case s.isConstant():
+	case s.isIdentifier():
+		if err := s.name_expr(); err != nil {
+			return err
+		}
+	default:
+		return &expectedConstOrIdent
 	}
 
 	if terminal := s.next(); terminal == EOF || terminal == lexer.RPAR {
@@ -336,7 +395,7 @@ func (s *stackParser) condition_expr() *parseErr {
 	return nil
 }
 
-// subquery expresion where name in
+// WHERE_SUBQUERY := IN ( DML_EXPR ) | IN ( DML_EXPR ) BOOL_OP CONDITION
 func (s *stackParser) where_subquery_expr() *parseErr {
 	s.next()
 	if err := s.pushParStack(); err != nil {
@@ -351,8 +410,15 @@ func (s *stackParser) where_subquery_expr() *parseErr {
 		return err
 	}
 
-	if terminal := s.next(); terminal == EOF {
+	terminal := s.peekAt(0)
+
+	if terminal == EOF || terminal == lexer.RPAR {
 		return nil
+	}
+
+	if s.isOpBool() {
+		s.next()
+		return s.condition_expr()
 	}
 
 	return &unexpectedToken
