@@ -98,7 +98,7 @@ var (
 	keywords     = `[A-Za-z_][A-Za-z0-9_#]*` // kewords and identifiers
 	constant     = `\b\d+\b|'[^']*'`         // Strings and numbers
 	delimitators = `[.,()*']`                // is '*' a delimitator?
-	relations    = `>=|<=|!=|=|>|<`          //
+	relations    = `>=|<=|<>|=|>|<`          //
 	noLexer      = `[^\w\s.,()'>=<]`         // Any to catch errors
 )
 

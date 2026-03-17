@@ -53,6 +53,18 @@ var expectRelational = parseErr{
 	Err:  errors.New("A relational operator is expected"),
 }
 
+var expectParenthesisClosed = parseErr{
+	Typ:  2,
+	Code: 209,
+	Err:  errors.New("Parenthesis not closed"),
+}
+
+var unexpectedToken = parseErr{
+	Typ:  2,
+	Code: 210,
+	Err:  errors.New("Unexpcted token"),
+}
+
 // Type 0 kernel error
 var maxRecursionReached = parseErr{
 	Typ:  0,

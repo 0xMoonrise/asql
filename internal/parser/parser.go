@@ -8,9 +8,10 @@ const EOF = -1
 const maxRecursion = 10
 
 type stackParser struct {
-	ptr   int
-	depth int
-	stack []lexer.Token
+	ptr        int
+	depth      int
+	parCounter int
+	stack      []lexer.Token
 }
 
 func (s *stackParser) expect(value lexer.Value, err parseErr) *parseErr {
@@ -35,8 +36,11 @@ func (s *stackParser) next() lexer.Value {
 	return EOF
 }
 
-func (s *stackParser) tokenAt(position int) lexer.Token {
-	return s.stack[s.ptr+position]
+func (s *stackParser) tokenAt(position int) *lexer.Token {
+	if s.ptr+position < len(s.stack) {
+		return &s.stack[s.ptr+position]
+	}
+	return nil
 }
 
 func (s *stackParser) isIdentifier() bool {
@@ -52,11 +56,39 @@ func (s *stackParser) isConstant() bool {
 	return s.peekAt(0) >= 600
 }
 
+func (s *stackParser) isOpBool() bool {
+	v := s.peekAt(0)
+	return v == lexer.AND || v == lexer.OR || v == lexer.NOT
+}
+
+func (s *stackParser) pushParStack() *parseErr {
+	if s.tokenAt(0).V == lexer.LPAR {
+		s.parCounter++
+		s.ptr++
+		return nil
+	}
+	return &expectDelimiter
+}
+
+func (s *stackParser) popParStack() *parseErr {
+	if s.tokenAt(0).V == lexer.RPAR {
+		s.parCounter--
+		if terminal := s.next(); terminal == EOF && s.parCounter != 0 {
+			return &expectParenthesisClosed
+		}
+
+		return nil
+	}
+
+	return &expectDelimiter
+}
+
 func NewParser(tokens []lexer.Token) *stackParser {
 	p := &stackParser{
-		ptr:   0,
-		depth: 0,
-		stack: tokens,
+		ptr:        0,
+		depth:      0,
+		parCounter: 0,
+		stack:      tokens,
 	}
 	return p
 }
@@ -67,6 +99,26 @@ func (s *stackParser) Parse() *parseErr {
 		return &emptyStack
 	}
 
+	if err := s.dml_expr(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *stackParser) safeRecursion() *parseErr {
+	s.depth++
+	if s.depth > maxRecursion {
+		return &maxRecursionReached
+	}
+	return nil
+}
+
+func (s *stackParser) unwind() {
+	s.depth--
+}
+
+func (s *stackParser) dml_expr() *parseErr {
 	if err := s.select_expr(); err != nil {
 		return err
 	}
@@ -84,18 +136,6 @@ func (s *stackParser) Parse() *parseErr {
 	}
 
 	return nil
-}
-
-func (s *stackParser) safeRecursion() *parseErr {
-	s.depth++
-	if s.depth > maxRecursion {
-		return &maxRecursionReached
-	}
-	return nil
-}
-
-func (s *stackParser) unwind() {
-	s.depth--
 }
 
 // SELECT_EXPR  := SELECT * FROM_EXPR | SELECT COLUMNS_EXPR FROM_EXPR
@@ -216,7 +256,7 @@ func (s *stackParser) databases_expr() *parseErr {
 		return err
 	}
 
-	if terminal := s.next(); terminal == EOF || terminal == lexer.WHERE {
+	if terminal := s.next(); terminal == EOF || terminal == lexer.WHERE || terminal == lexer.RPAR {
 		return nil
 	}
 
@@ -239,21 +279,40 @@ func (s *stackParser) databases_expr() *parseErr {
 }
 
 // WHERE_CLAUSE := WHERE CONDITION STMT
-// STMT         := AND CONDITION STMT | OR CONDITION STMT |  λ
 func (s *stackParser) where_clause() *parseErr {
-
 	if err := s.expect(lexer.WHERE, expectKeyword); err != nil {
 		return err
 	}
 
 	s.next()
-	if !s.isIdentifier() {
-		return &expectIdentifier
+
+	if err := s.condition_expr(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CONDITION := NAME_EXPR RELATION CONSTANT | ( CONDITION STMT )
+func (s *stackParser) condition_expr() *parseErr {
+
+	if err := s.safeRecursion(); err != nil {
+		return err
+	}
+
+	defer s.unwind()
+
+	if err := s.name_expr(); err != nil {
+		return err
 	}
 
 	s.next()
+	if s.peekAt(0) == lexer.IN {
+		return s.where_subquery_expr()
+	}
+
 	if err := s.relation_expr(); err != nil {
-		return err
+		return &expectRelational
 	}
 
 	s.next()
@@ -261,7 +320,42 @@ func (s *stackParser) where_clause() *parseErr {
 		return &expectConstant
 	}
 
+	if terminal := s.next(); terminal == EOF || terminal == lexer.RPAR {
+		return nil
+	}
+
+	if !s.isOpBool() {
+		return &expectOperator
+	}
+
+	s.next()
+	if err := s.condition_expr(); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// subquery expresion where name in
+func (s *stackParser) where_subquery_expr() *parseErr {
+	s.next()
+	if err := s.pushParStack(); err != nil {
+		return err
+	}
+
+	if err := s.dml_expr(); err != nil {
+		return err
+	}
+
+	if err := s.popParStack(); err != nil {
+		return err
+	}
+
+	if terminal := s.next(); terminal == EOF {
+		return nil
+	}
+
+	return &unexpectedToken
 }
 
 // RELATION := = | < | <= | > | >= | <>
