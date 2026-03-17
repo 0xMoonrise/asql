@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/0xMoonrise/asql/internal/lexer"
+	"github.com/0xMoonrise/asql/internal/parser"
 	"github.com/gin-gonic/gin"
 )
 
@@ -96,7 +97,6 @@ func (app *app) root(c *gin.Context) {
 
 func (app *app) run(c *gin.Context) {
 	formText := c.PostForm("text")
-
 	if len(formText) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "No source code were provided",
@@ -104,15 +104,16 @@ func (app *app) run(c *gin.Context) {
 		return
 	}
 
+	sourceLines := strings.Split(formText, "\n")
+
 	lines := [][]string{}
-	for str := range strings.SplitSeq(formText, "\n") {
+	for _, str := range sourceLines {
 		tokens := lexer.Tokenize(str)
 		lines = append(lines, tokens)
 	}
 
 	tokenStream, lexerErrors := lexer.Lexer(lines)
 	errors := []string{}
-
 	for _, err := range lexerErrors {
 		errors = append(errors, fmt.Sprintf("Line %d: %v", err.Line, err.Err.Error()))
 	}
@@ -120,6 +121,14 @@ func (app *app) run(c *gin.Context) {
 	data := tableLexer(tokenStream)
 	if len(errors) > 0 {
 		data["Errors"] = errors
+	}
+
+	parser := parser.NewParser(tokenStream)
+	if err := parser.Parse(); err != nil {
+		line := parser.State.Token.Line
+		data["parser"] = err.Error()
+		data["parser_line"] = sourceLines[line-1]
+		data["parser_line_number"] = line
 	}
 
 	c.JSON(http.StatusOK, data)

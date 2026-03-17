@@ -53,7 +53,7 @@ st.markdown("""
 response = code_editor(
     "",
     lang="sql",
-    height=[5, 10], # type: ignore[arg-type]
+    height=[10, 20], # type: ignore[arg-type]
     buttons=custom_buttons,
     options=editor_options,
     key="editor"
@@ -61,41 +61,36 @@ response = code_editor(
 
 if response["type"] == "submit" and response["text"]:
     query = response["text"]
-
     st.subheader("Status")
 
     try:
-        res = requests.post(
-            f"{app_url}/run",
-            data={"text": query}
-        )
+        res = requests.post(f"{app_url}/run", data={"text": query})
         res.raise_for_status()
         data = res.json()
+        st.session_state["data"] = data
 
-        st.session_state["lexer_data"] = data
-
-        # User error module lexer level
         if "Errors" in data and data["Errors"]:
             for err in data["Errors"]:
                 st.error(f"{err}")
+        elif "parser" in data:
+            st.error("Syntax error detected.")
         else:
             st.success("Query executed successfully.")
 
     except requests.exceptions.RequestException as e:
         logging.error(e)
-        st.error(f"Connection error")
+        st.error("Connection error")
     except Exception as e:
         logging.error(e)
-        st.error(f"Application error")
-
+        st.error("Application error")
 
 tab_lexer, tab_parser, tab_semantic = st.tabs(["Lexer", "Parser", "Semantic"])
 with tab_lexer:
-    if "lexer_data" not in st.session_state \
-       or not st.session_state["lexer_data"]:
+    if "data" not in st.session_state \
+       or not st.session_state["data"]:
         st.info("Run a query in the Editor tab to see the Lexer results here.")
     else:
-        data = st.session_state["lexer_data"]
+        data = st.session_state["data"]
         st.subheader("Global Table")
         if "GlobalHeaders" in data and "GlobalTable" in data:
             df_global = pd.DataFrame(data["GlobalTable"],
@@ -123,3 +118,22 @@ with tab_lexer:
                     df_const[col] = utils.safe_to_numeric(df_const[col])
             df_const.index += 1
             st.dataframe(df_const, width='stretch')
+
+with tab_parser:
+    if "data" not in st.session_state or not st.session_state["data"]:
+        st.info("Run a query in the Editor tab to see the Parser results here.")
+    else:
+        data = st.session_state["data"]
+
+        if "Errors" in data and data["Errors"]:
+            st.info("A lexer error was detected, please correct it to proceed to parser analysis.")
+
+        elif "parser" in data:
+            st.subheader("Parser Error")
+            line_num = data.get("parser_line_number", "?")
+            line_src = data.get("parser_line", "")
+            st.error(data["parser"])
+            st.code(f"Line {line_num}: {line_src}", language="sql")
+
+        else:
+            st.success("Query is grammatically correct.")

@@ -15,6 +15,13 @@ type stackParser struct {
 	depth      int
 	parCounter int
 	stack      []lexer.Token
+	State      ErrorState
+}
+
+type ErrorState struct {
+	Ptr     int
+	Message error
+	Token   lexer.Token
 }
 
 func (s *stackParser) expect(value lexer.Value, err parseErr) *parseErr {
@@ -92,6 +99,7 @@ func NewParser(tokens []lexer.Token) *stackParser {
 		depth:      0,
 		parCounter: 0,
 		stack:      tokens,
+		State:      ErrorState{},
 	}
 	return p
 }
@@ -107,7 +115,13 @@ func (s *stackParser) Parse() *parseErr {
 			fmt.Printf("[%d] L=%s V=%d T=%d\n", i, t.L, t.V, t.T)
 		}
 	}
+
 	if err := s.dml_expr(); err != nil {
+		s.State = ErrorState{
+			Message: err,
+			Token:   *s.tokenAt(0),
+			Ptr:     s.ptr,
+		}
 		fmt.Printf("failed at ptr=%d token=%v\n", s.ptr, s.stack[s.ptr])
 		return err
 	}
@@ -352,8 +366,11 @@ func (s *stackParser) condition_expr() *parseErr {
 	if err := s.safeRecursion(); err != nil {
 		return err
 	}
-
 	defer s.unwind()
+
+	if s.peekAt(0) == lexer.NOT {
+		s.next()
+	}
 
 	if err := s.name_expr(); err != nil {
 		return err
@@ -384,10 +401,15 @@ func (s *stackParser) condition_expr() *parseErr {
 	}
 
 	if !s.isOpBool() {
-		return &expectOperator
+		return &expectKeyword
 	}
 
 	s.next()
+
+	if s.peekAt(0) == lexer.NOT {
+		s.next()
+	}
+
 	if err := s.condition_expr(); err != nil {
 		return err
 	}
@@ -401,23 +423,25 @@ func (s *stackParser) where_subquery_expr() *parseErr {
 	if err := s.pushParStack(); err != nil {
 		return err
 	}
-
 	if err := s.dml_expr(); err != nil {
 		return err
 	}
-
 	if err := s.popParStack(); err != nil {
 		return err
 	}
 
 	terminal := s.peekAt(0)
-
 	if terminal == EOF || terminal == lexer.RPAR {
 		return nil
 	}
 
 	if s.isOpBool() {
 		s.next()
+
+		if s.peekAt(0) == lexer.NOT {
+			s.next()
+		}
+
 		return s.condition_expr()
 	}
 
