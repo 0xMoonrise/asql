@@ -127,8 +127,14 @@ func (app *app) run(c *gin.Context) {
 	if err := parser.Parse(); err != nil {
 		line := parser.State.Token.Line
 		data["parser"] = err.Error()
-		data["parser_line"] = sourceLines[line-1]
-		data["parser_line_number"] = line
+
+		if line > 0 && line <= len(sourceLines) {
+			data["parser_line"] = sourceLines[line-1]
+			data["parser_line_number"] = line
+		} else {
+			data["parser_line"] = ""
+			data["parser_line_number"] = 0
+		}
 	}
 
 	c.JSON(http.StatusOK, data)
