@@ -1,4 +1,4 @@
-from railroad import Diagram, Sequence, Choice, Optional, OneOrMore, ZeroOrMore, NonTerminal, Terminal
+from railroad import Diagram, Sequence, Choice, Optional, OneOrMore, NonTerminal, Terminal
 
 DDL_RULES = {
     "DDL_EXPR": (
@@ -148,9 +148,13 @@ DML_RULES = {
     "NAME_EXPR": (
         "Simple or qualified name",
         Diagram(
-            Sequence(
+            Choice(0,
                 NonTerminal("IDENTIFIER"),
-                Optional(Sequence(Terminal("."), NonTerminal("IDENTIFIER")))
+                Sequence(
+                    NonTerminal("IDENTIFIER"),
+                    Terminal("."),
+                    NonTerminal("IDENTIFIER")
+                )
             )
         )
     ),
@@ -178,7 +182,9 @@ DML_RULES = {
                     Optional(NonTerminal("ALIAS"))
                 ),
                 Sequence(
-                    Terminal("("), NonTerminal("DML_EXPR"), Terminal(")"),
+                    Terminal("("),
+                    NonTerminal("DML_EXPR"),
+                    Terminal(")"),
                     NonTerminal("ALIAS")
                 )
             )
@@ -198,35 +204,30 @@ DML_RULES = {
         )
     ),
     "CONDITION_EXPR": (
-        "Boolean condition with optional NOT",
+        "Boolean condition",
         Diagram(
             Sequence(
                 Optional(Terminal("NOT")),
-                NonTerminal("TERM_EXPR"),
-                ZeroOrMore(
-                    Sequence(
-                        Choice(0, Terminal("AND"), Terminal("OR")),
-                        Optional(Terminal("NOT")),
-                        NonTerminal("TERM_EXPR")
-                    )
-                )
-            )
-        )
-    ),
-    "TERM_EXPR": (
-        "Single condition term",
-        Diagram(
-            Sequence(
                 NonTerminal("NAME_EXPR"),
                 Choice(0,
+                    NonTerminal("WHERE_SUBQUERY"),
                     Sequence(
                         NonTerminal("RELATION_EXPR"),
                         Choice(0,
                             NonTerminal("CONSTANT"),
                             NonTerminal("NAME_EXPR")
+                        ),
+                        Optional(
+                            Sequence(
+                                Choice(0,
+                                    Terminal("AND"),
+                                    Terminal("OR")
+                                ),
+                                Optional(Terminal("NOT")),
+                                NonTerminal("CONDITION_EXPR")
+                            )
                         )
-                    ),
-                    NonTerminal("WHERE_SUBQUERY")
+                    )
                 )
             )
         )
@@ -241,8 +242,16 @@ DML_RULES = {
                 Terminal(")"),
                 Optional(
                     Sequence(
-                        Choice(0, Terminal("AND"), Terminal("OR")),
-                        Optional(Terminal("NOT")),
+                        Choice(0,
+                            Sequence(
+                                Choice(0,
+                                    Terminal("AND"),
+                                    Terminal("OR")
+                                ),
+                                Optional(Terminal("NOT"))
+                            ),
+                            Terminal("NOT")
+                        ),
                         NonTerminal("CONDITION_EXPR")
                     )
                 )

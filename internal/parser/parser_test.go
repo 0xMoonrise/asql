@@ -268,7 +268,7 @@ func TestSubqueryInFromInvalid(t *testing.T) {
 
 func TestErrorCodes(t *testing.T) {
 	runErrorCodes(t, []errorCodeCase{
-		{"FROM foo", "missing SELECT", 201},
+		{"FROM foo", "missing SELECT", 211},
 		{"SELECT * foo", "missing FROM keyword", 201},
 
 		{"SELECT a, FROM foo", "trailing comma in columns", 204},

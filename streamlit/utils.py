@@ -34,34 +34,6 @@ def to_svg(diagram) -> str:
     svg = svg.replace("<svg ", f"{custom_style}<svg ", 1)
     return svg
 
-# def grammar_tab(rules: dict, key_prefix: str):
-#     rule = st.selectbox(
-#         "Select a rule:",
-#         options=[None] + list(rules.keys()),
-#         format_func=lambda k: "— Select a rule to view its diagram —" if k is None
-#                               else f"{k} — {rules[k][0]}",
-#         key=f"select_{key_prefix}",
-#     )
-
-#     st.divider()
-
-#     if rule is None:
-#         st.info("Select a rule from the dropdown above to view its railroad diagram.")
-#     else:
-#         desc, diagram = rules[rule]
-#         st.caption(f"**{rule}** — {desc}")
-#         svg = to_svg(diagram)
-#         components.html(
-#             f"""
-#             <div style="background:#1a1a2e; padding:20px; border-radius:8px; display:flex; justify-content:center; align-items:center; min-height:200px;">
-#                 {svg}
-#             </div>
-#             """,
-#             height=300,
-#             scrolling=True
-#         )
-
-
 def grammar_tab(rules: dict):
     for rule, (desc, diagram) in rules.items():
         with st.expander(f"**{rule}** — {desc}"):
@@ -73,5 +45,5 @@ def grammar_tab(rules: dict):
                 </div>
                 """,
                 height=300,
-                scrolling=True
+                scrolling=False
             )

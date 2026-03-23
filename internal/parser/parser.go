@@ -377,10 +377,9 @@ func (s *stackParser) where_clause() *parseErr {
 	return nil
 }
 
-// CONDITION_EXPR  := NAME_EXPR RELATION_EXPR CONSTANT
-//                  | NAME_EXPR RELATION_EXPR NAME_EXPR
-//                  | NAME_EXPR WHERE_SUBQUERY
-//                  | CONDITION_EXPR AND | OR | NOT CONDITION_EXPR
+// CONDITION_EXPR := [NOT] NAME_EXPR RELATION_EXPR CONSTANT  { (AND | OR) [NOT] CONDITION_EXPR }
+//                 | [NOT] NAME_EXPR RELATION_EXPR NAME_EXPR { (AND | OR) [NOT] CONDITION_EXPR }
+//                 | [NOT] NAME_EXPR WHERE_SUBQUERY
 
 func (s *stackParser) condition_expr() *parseErr {
 
@@ -388,7 +387,6 @@ func (s *stackParser) condition_expr() *parseErr {
 		return err
 	}
 	defer s.unwind()
-
 	if s.peekAt(0) == lexer.NOT {
 		s.next()
 	}
