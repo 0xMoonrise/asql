@@ -1,4 +1,4 @@
-from railroad import Diagram, Sequence, Choice, Optional, OneOrMore, NonTerminal, Terminal
+from railroad import Diagram, Sequence, Choice, Optional, OneOrMore, ZeroOrMore, NonTerminal, Terminal
 
 DDL_RULES = {
     "DDL_EXPR": (
@@ -16,12 +16,20 @@ DDL_RULES = {
     "TABLE_BODY": (
         "Columns and constraints",
         Diagram(
-            OneOrMore(
+            Sequence(
                 Choice(0,
                     NonTerminal("COLUMN_DEF"),
                     NonTerminal("CONSTRAINT_DEF")
                 ),
-                Terminal(",")
+                ZeroOrMore(
+                    Sequence(
+                        Terminal(","),
+                        Choice(0,
+                            NonTerminal("COLUMN_DEF"),
+                            NonTerminal("CONSTRAINT_DEF")
+                        )
+                    )
+                )
             )
         )
     ),
@@ -41,6 +49,7 @@ DDL_RULES = {
             Choice(0,
                 NonTerminal("NUMERIC_TYPE"),
                 NonTerminal("CHAR_TYPE"),
+                NonTerminal("DATE"),
             )
         )
     ),
@@ -232,6 +241,36 @@ DML_RULES = {
             )
         )
     ),
+    "CONDITION_EXPR": (
+        "Boolean condition",
+        Diagram(
+            Choice(0,
+                Sequence(
+                    NonTerminal("NAME_EXPR"),
+                    Optional(Terminal("NOT")),
+                    NonTerminal("WHERE_SUBQUERY")
+                ),
+                Sequence(
+                    Optional(Terminal("NOT")),
+                    NonTerminal("NAME_EXPR"),
+                    NonTerminal("RELATION_EXPR"),
+                    Choice(0,
+                        NonTerminal("CONSTANT"),
+                        NonTerminal("NAME_EXPR")
+                    ),
+                    ZeroOrMore(
+                        Sequence(
+                            Choice(0,
+                                Terminal("AND"),
+                                Terminal("OR")
+                            ),
+                            NonTerminal("CONDITION_EXPR")
+                        )
+                    )
+                )
+            )
+        )
+    ),
     "WHERE_SUBQUERY": (
         "IN subquery with optional continuation",
         Diagram(
@@ -243,15 +282,10 @@ DML_RULES = {
                 Optional(
                     Sequence(
                         Choice(0,
-                            Sequence(
-                                Choice(0,
-                                    Terminal("AND"),
-                                    Terminal("OR")
-                                ),
-                                Optional(Terminal("NOT"))
-                            ),
-                            Terminal("NOT")
+                            Terminal("AND"),
+                            Terminal("OR")
                         ),
+                        Optional(Terminal("NOT")),
                         NonTerminal("CONDITION_EXPR")
                     )
                 )

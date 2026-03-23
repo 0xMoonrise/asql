@@ -193,6 +193,10 @@ func TestSubqueryInWhereValid(t *testing.T) {
 			"simple IN subquery",
 		},
 		{
+			"SELECT * FROM foo WHERE a NOT IN (SELECT a FROM bar)",
+			"simple NOT IN subquery",
+		},
+		{
 			"SELECT * FROM foo WHERE a IN (SELECT a FROM bar WHERE b = 1)",
 			"IN subquery with WHERE",
 		},

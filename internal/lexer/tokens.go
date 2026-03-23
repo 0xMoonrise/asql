@@ -28,6 +28,8 @@ const (
 	INSERT
 	INTO
 	VALUES
+	DATE
+	CHECK
 )
 
 // delimitators

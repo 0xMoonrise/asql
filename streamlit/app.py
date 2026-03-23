@@ -11,6 +11,8 @@ import diagrams
 # https://wiki.documentfoundation.org/Documentation/SyntaxDiagrams
 # https://www.cs.cornell.edu/courses/cs4120/2026sp/notes/
 
+st.set_page_config(page_title="Asql")
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -144,24 +146,25 @@ with tab_parser:
 
 with tab_grammar:
 
-    st.set_page_config(page_title="SQL Grammar")
-    st.title("SQL Grammar — SQL Server")
+    st.title("SQL Grammar")
 
     tab_ddl, tab_dml = st.tabs(["DDL — CREATE TABLE", "DML — SELECT"])
 
     with tab_ddl:
         st.code("""
-DDL_EXPR        := CREATE TABLE IDENTIFIER ( TABLE_BODY )
-TABLE_BODY      := (COLUMN_DEF | CONSTRAINT_DEF) { , (COLUMN_DEF | CONSTRAINT_DEF) }
+DDL_EXPR        := CREATE TABLE IDENTIFIER LPAR TABLE_BODY RPAR
+TABLE_BODY      := (COLUMN_DEF | CONSTRAINT_DEF)
+                   { , (COLUMN_DEF | CONSTRAINT_DEF) }
 COLUMN_DEF      := IDENTIFIER DATA_TYPE [ NULLABILITY ]
 DATA_TYPE       := NUMERIC_TYPE | CHAR_TYPE | DATE
-NUMERIC_TYPE    := NUMERIC ( INTEGER [ , INTEGER ] )
-CHAR_TYPE       := CHAR ( INTEGER )
+NUMERIC_TYPE    := NUMERIC LPAR INTEGER [ , INTEGER ] RPAR
+CHAR_TYPE       := CHAR LPAR INTEGER RPAR
 NULLABILITY     := NOT NULL | NULL
 CONSTRAINT_DEF  := CONSTRAINT IDENTIFIER CONSTRAINT_TYPE
-CONSTRAINT_TYPE := PRIMARY KEY ( COL_LIST )
-                 | FOREIGN KEY IDENTIFIER ( COL_LIST ) REFERENCES IDENTIFIER ( COL_LIST )
-                 | CHECK ( CONDITION )
+CONSTRAINT_TYPE := PRIMARY KEY LPAR COL_LIST RPAR
+                 | CHECK LPAR CONDITION RPAR
+                 | FOREIGN KEY IDENTIFIER LPAR COL_LIST RPAR
+                   REFERENCES IDENTIFIER LPAR COL_LIST RPAR
 COL_LIST        := IDENTIFIER { , IDENTIFIER }
         """, language="bnf")
         utils.grammar_tab(diagrams.DDL_RULES)
@@ -174,15 +177,14 @@ COLUMNS_EXPR    := NAME_EXPR { , NAME_EXPR }
 NAME_EXPR       := IDENTIFIER | IDENTIFIER . IDENTIFIER
 FROM_EXPR       := FROM DATABASES_EXPR
 DATABASES_EXPR  := TABLE_EXPR { , TABLE_EXPR }
-TABLE_EXPR      := NAME_EXPR [ ALIAS ] | ( DML_EXPR ) ALIAS
+TABLE_EXPR      := NAME_EXPR [ ALIAS ] | LPAR DML_EXPR RPAR ALIAS
 ALIAS           := IDENTIFIER
 
 WHERE_CLAUSE    := WHERE CONDITION_EXPR
-CONDITION_EXPR  := [NOT] NAME_EXPR RELATION_EXPR CONSTANT  { (AND | OR) [NOT] CONDITION_EXPR }
-                 | [NOT] NAME_EXPR RELATION_EXPR NAME_EXPR { (AND | OR) [NOT] CONDITION_EXPR }
-                 | [NOT] NAME_EXPR WHERE_SUBQUERY
-
-WHERE_SUBQUERY  := IN ( DML_EXPR ) [ AND | OR | NOT CONDITION_EXPR ]
+CONDITION_EXPR  := NAME_EXPR [NOT] WHERE_SUBQUERY
+                 | [NOT] NAME_EXPR RELATION_EXPR
+                   (CONSTANT | NAME_EXPR) { (AND | OR) [NOT] CONDITION_EXPR }
+WHERE_SUBQUERY  := IN LPAR DML_EXPR RPAR [ (AND | OR ) [NOT] CONDITION_EXPR ]
 RELATION_EXPR   := = | < | <= | > | >= | <>
         """, language="bnf")
         utils.grammar_tab(diagrams.DML_RULES)
