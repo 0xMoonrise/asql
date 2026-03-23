@@ -71,6 +71,12 @@ var expectedConstOrIdent = parseErr{
 	Err:  errors.New("expected a constant or identifier"),
 }
 
+var expectedKeywordAtStart = parseErr{
+	Typ:  2,
+	Code: 211,
+	Err:  errors.New("Expected a select, create or insert"),
+}
+
 // Type 0 kernel error
 var maxRecursionReached = parseErr{
 	Typ:  0,

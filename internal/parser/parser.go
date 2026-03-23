@@ -89,7 +89,6 @@ func (s *stackParser) popParStack() *parseErr {
 
 		return nil
 	}
-
 	return &expectDelimiter
 }
 
@@ -104,6 +103,14 @@ func NewParser(tokens []lexer.Token) *stackParser {
 	return p
 }
 
+func (s *stackParser) NewErrState(err error) ErrorState {
+	return ErrorState{
+		Message: err,
+		Token:   *s.tokenAt(0),
+		Ptr:     s.ptr,
+	}
+}
+
 func (s *stackParser) Parse() *parseErr {
 
 	if len(s.stack) == 0 {
@@ -116,13 +123,22 @@ func (s *stackParser) Parse() *parseErr {
 		}
 	}
 
-	if err := s.dml_expr(); err != nil {
-		s.State = ErrorState{
-			Message: err,
-			Token:   *s.tokenAt(0),
-			Ptr:     s.ptr,
+	switch s.stack[0].V {
+	case lexer.SELECT:
+		if err := s.dml_expr(); err != nil {
+			s.State = s.NewErrState(err)
+			fmt.Printf("failed at ptr=%d token=%v\n", s.ptr, s.stack[s.ptr])
+			return err
 		}
-		fmt.Printf("failed at ptr=%d token=%v\n", s.ptr, s.stack[s.ptr])
+	case lexer.CREATE:
+		if err := s.ddl_expr(); err != nil {
+			s.State = s.NewErrState(err)
+			fmt.Printf("failed at ptr=%d token=%v\n", s.ptr, s.stack[s.ptr])
+			return err
+		}
+	default:
+		err := &expectedKeywordAtStart
+		s.State = s.NewErrState(err)
 		return err
 	}
 
@@ -141,6 +157,7 @@ func (s *stackParser) unwind() {
 	s.depth--
 }
 
+// DML_EXPR := SELECT_EXPR FROM_EXPR [ WHERE_CLAUSE ]
 func (s *stackParser) dml_expr() *parseErr {
 	if err := s.select_expr(); err != nil {
 		return err
@@ -161,7 +178,7 @@ func (s *stackParser) dml_expr() *parseErr {
 	return nil
 }
 
-// SELECT_EXPR  := SELECT * FROM_EXPR | SELECT COLUMNS_EXPR FROM_EXPR
+// SELECT_EXPR := SELECT * | SELECT COLUMNS_EXPR
 func (s *stackParser) select_expr() *parseErr {
 
 	if err := s.expect(lexer.SELECT, expectKeyword); err != nil {
@@ -179,12 +196,11 @@ func (s *stackParser) select_expr() *parseErr {
 	default:
 		return &expectedColOrStar
 	}
-
 	return nil
 }
 
 // columns_expr: ptr must point to the first identifier on entry
-// COLUMNS_EXPR := NAME_EXPR | NAME_EXPR , COLUMNS_EXPR
+// COLUMNS_EXPR := NAME_EXPR { , NAME_EXPR }
 func (s *stackParser) columns_expr() *parseErr {
 
 	if err := s.name_expr(); err != nil {
@@ -247,7 +263,7 @@ func (s *stackParser) name_expr() *parseErr {
 	return nil
 }
 
-// FROM_EXPR    := FROM NAME_EXPR | FROM NAME_EXPR WHERE_CLAUSE
+// DATABASES_EXPR := TABLE_EXPR { , TABLE_EXPR }
 func (s *stackParser) from_expr() *parseErr {
 	if err := s.expect(lexer.FROM, expectKeyword); err != nil {
 		return err
@@ -294,7 +310,7 @@ func (s *stackParser) databases_expr() *parseErr {
 	}
 }
 
-// TABLE_EXPR := NAME_EXPR [ALIAS] | ( DML_EXPR ) ALIAS
+// TABLE_EXPR := NAME_EXPR [ ALIAS ] | ( DML_EXPR ) ALIAS
 func (s *stackParser) table_expr() *parseErr {
 
 	if s.peekAt(0) == lexer.LPAR {
@@ -334,6 +350,7 @@ func (s *stackParser) table_expr() *parseErr {
 	return nil
 }
 
+// check if the pointer is in the end of expression
 func (s *stackParser) expectTableTerminator() *parseErr {
 	terminal := s.peekAt(0)
 	if terminal == EOF ||
@@ -345,7 +362,7 @@ func (s *stackParser) expectTableTerminator() *parseErr {
 	return &unexpectedToken
 }
 
-// WHERE_CLAUSE := WHERE CONDITION STMT
+// WHERE_CLAUSE := WHERE CONDITION_EXPR
 func (s *stackParser) where_clause() *parseErr {
 	if err := s.expect(lexer.WHERE, expectKeyword); err != nil {
 		return err
@@ -360,7 +377,11 @@ func (s *stackParser) where_clause() *parseErr {
 	return nil
 }
 
-// CONDITION := NAME_EXPR RELATION CONSTANT | ( CONDITION STMT )
+// CONDITION_EXPR  := NAME_EXPR RELATION_EXPR CONSTANT
+//                  | NAME_EXPR RELATION_EXPR NAME_EXPR
+//                  | NAME_EXPR WHERE_SUBQUERY
+//                  | CONDITION_EXPR AND | OR | NOT CONDITION_EXPR
+
 func (s *stackParser) condition_expr() *parseErr {
 
 	if err := s.safeRecursion(); err != nil {
@@ -417,7 +438,7 @@ func (s *stackParser) condition_expr() *parseErr {
 	return nil
 }
 
-// WHERE_SUBQUERY := IN ( DML_EXPR ) | IN ( DML_EXPR ) BOOL_OP CONDITION
+// WHERE_SUBQUERY := IN ( DML_EXPR ) [ AND | OR [ NOT ] CONDITION_EXPR ]
 func (s *stackParser) where_subquery_expr() *parseErr {
 	s.next()
 	if err := s.pushParStack(); err != nil {
@@ -448,7 +469,7 @@ func (s *stackParser) where_subquery_expr() *parseErr {
 	return &unexpectedToken
 }
 
-// RELATION := = | < | <= | > | >= | <>
+// RELATION_EXPR := = | < | <= | > | >= | <>
 func (s *stackParser) relation_expr() *parseErr {
 	if !s.isRelation() {
 		return &expectRelational

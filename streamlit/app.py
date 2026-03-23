@@ -6,6 +6,10 @@ import pandas as pd
 import os
 import utils
 import logging
+import diagrams
+
+# https://wiki.documentfoundation.org/Documentation/SyntaxDiagrams
+# https://www.cs.cornell.edu/courses/cs4120/2026sp/notes/
 
 logging.basicConfig(
     level=logging.INFO,
@@ -84,7 +88,7 @@ if response["type"] == "submit" and response["text"]:
         logging.error(e)
         st.error("Application error")
 
-tab_lexer, tab_parser, tab_semantic = st.tabs(["Lexer", "Parser", "Semantic"])
+tab_lexer, tab_parser, tab_AST, tab_grammar = st.tabs(["Lexer", "Parser", "AST", "Grammar"])
 with tab_lexer:
     if "data" not in st.session_state \
        or not st.session_state["data"]:
@@ -137,3 +141,49 @@ with tab_parser:
 
         else:
             st.success("Query is grammatically correct.")
+
+with tab_grammar:
+
+    st.set_page_config(page_title="SQL Grammar")
+    st.title("SQL Grammar — SQL Server")
+
+    tab_ddl, tab_dml = st.tabs(["DDL — CREATE TABLE", "DML — SELECT"])
+
+    with tab_ddl:
+        st.code("""
+DDL_EXPR        := CREATE TABLE IDENTIFIER ( TABLE_BODY )
+TABLE_BODY      := (COLUMN_DEF | CONSTRAINT_DEF) { , (COLUMN_DEF | CONSTRAINT_DEF) }
+COLUMN_DEF      := IDENTIFIER DATA_TYPE [ NULLABILITY ]
+DATA_TYPE       := NUMERIC_TYPE | CHAR_TYPE | DATE
+NUMERIC_TYPE    := NUMERIC ( INTEGER [ , INTEGER ] )
+CHAR_TYPE       := CHAR ( INTEGER )
+NULLABILITY     := NOT NULL | NULL
+CONSTRAINT_DEF  := CONSTRAINT IDENTIFIER CONSTRAINT_TYPE
+CONSTRAINT_TYPE := PRIMARY KEY ( COL_LIST )
+                 | FOREIGN KEY IDENTIFIER ( COL_LIST ) REFERENCES IDENTIFIER ( COL_LIST )
+                 | CHECK ( CONDITION )
+COL_LIST        := IDENTIFIER { , IDENTIFIER }
+        """, language="bnf")
+        utils.grammar_tab(diagrams.DDL_RULES)
+
+    with tab_dml:
+        st.code("""
+DML_EXPR        := SELECT_EXPR FROM_EXPR [ WHERE_CLAUSE ]
+SELECT_EXPR     := SELECT * | SELECT COLUMNS_EXPR
+COLUMNS_EXPR    := NAME_EXPR { , NAME_EXPR }
+NAME_EXPR       := IDENTIFIER | IDENTIFIER . IDENTIFIER
+FROM_EXPR       := FROM DATABASES_EXPR
+DATABASES_EXPR  := TABLE_EXPR { , TABLE_EXPR }
+TABLE_EXPR      := NAME_EXPR [ ALIAS ] | ( DML_EXPR ) ALIAS
+ALIAS           := IDENTIFIER
+
+WHERE_CLAUSE    := WHERE CONDITION_EXPR
+CONDITION_EXPR  := NAME_EXPR RELATION_EXPR CONSTANT
+                 | NAME_EXPR RELATION_EXPR NAME_EXPR
+                 | NAME_EXPR WHERE_SUBQUERY
+                 | CONDITION_EXPR AND | OR | NOT CONDITION_EXPR
+
+WHERE_SUBQUERY  := IN ( DML_EXPR ) [ AND | OR | NOT CONDITION_EXPR ]
+RELATION_EXPR   := = | < | <= | > | >= | <>
+        """, language="bnf")
+        utils.grammar_tab(diagrams.DML_RULES)
