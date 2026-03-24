@@ -258,7 +258,7 @@ DML_RULES = {
                         NonTerminal("CONSTANT"),
                         NonTerminal("NAME_EXPR")
                     ),
-                    ZeroOrMore(
+                    Optional(
                         Sequence(
                             Choice(0,
                                 Terminal("AND"),
@@ -272,26 +272,26 @@ DML_RULES = {
         )
     ),
     "WHERE_SUBQUERY": (
-        "IN subquery with optional continuation",
-        Diagram(
-            Sequence(
-                Terminal("IN"),
-                Terminal("("),
-                NonTerminal("DML_EXPR"),
-                Terminal(")"),
-                Optional(
-                    Sequence(
-                        Choice(0,
-                            Terminal("AND"),
-                            Terminal("OR")
-                        ),
-                        Optional(Terminal("NOT")),
-                        NonTerminal("CONDITION_EXPR")
-                    )
+    "IN subquery with optional continuation",
+    Diagram(
+        Sequence(
+            Terminal("IN"),
+            Terminal("("),
+            NonTerminal("DML_EXPR"),
+            Terminal(")"),
+            Optional(
+                Sequence(
+                    Choice(0,
+                        Terminal("AND"),
+                        Terminal("OR")
+                    ),
+                    Optional(Terminal("NOT")),
+                    NonTerminal("CONDITION_EXPR")
                 )
             )
         )
-    ),
+    )
+),
     "RELATION_EXPR": (
         "Comparison operator",
         Diagram(

@@ -37,7 +37,7 @@ func NewTable() lexer {
 		{L: "CREATE", V: CREATE, T: 1},
 		{L: "TABLE", V: TABLE, T: 1},
 		{L: "CHAR", V: CHAR, T: 1},
-		{L: "NUMERIC", V: NUMER, T: 1},
+		{L: "NUMERIC", V: NUMERIC, T: 1},
 		{L: "NOT", V: NOT, T: 1},
 		{L: "NULL", V: NULL, T: 1},
 		{L: "CONSTRAINT", V: CONSTRAIN, T: 1},
@@ -49,7 +49,7 @@ func NewTable() lexer {
 		{L: "INTO", V: INTO, T: 1},
 		{L: "VALUES", V: VALUES, T: 1},
 		{L: "DATE", V: DATE, T: 1},
-		{L: "CHECK", V: DATE, T: 1},
+		{L: "CHECK", V: CHECK, T: 1},
 		// delimitators (5)
 		{L: ",", V: COMMA, T: 5},
 		{L: ".", V: DOT, T: 5},

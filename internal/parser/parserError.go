@@ -77,6 +77,18 @@ var expectedKeywordAtStart = parseErr{
 	Err:  errors.New("Expected a select, create or insert"),
 }
 
+var expectedDataType = parseErr{
+	Typ:  2,
+	Code: 212,
+	Err:  errors.New("Expected a data type"),
+}
+
+var expectedConstraintType = parseErr{
+	Typ:  2,
+	Code: 213,
+	Err:  errors.New("Expected PRIMARY, CHECK or FOREIGN"),
+}
+
 // Type 0 kernel error
 var maxRecursionReached = parseErr{
 	Typ:  0,
