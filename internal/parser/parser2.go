@@ -110,6 +110,9 @@ func (s *stackParser) numeric_type() *parseErr {
 	if err := s.expect(lexer.RPAR, expectDelimiter); err != nil {
 		return err
 	}
+	if terminal := s.peekAt(1); terminal == EOF {
+		return &expectParenthesisClosed
+	}
 	s.next()
 	return nil
 }
@@ -130,6 +133,9 @@ func (s *stackParser) char_type() *parseErr {
 	s.next()
 	if err := s.expect(lexer.RPAR, expectDelimiter); err != nil {
 		return err
+	}
+	if terminal := s.peekAt(1); terminal == EOF {
+		return &expectParenthesisClosed
 	}
 	s.next()
 	return nil
@@ -185,6 +191,9 @@ func (s *stackParser) constraint_type() *parseErr {
 		if err := s.expect(lexer.RPAR, expectDelimiter); err != nil {
 			return err
 		}
+		if terminal := s.peekAt(1); terminal == EOF {
+			return &expectParenthesisClosed
+		}
 		s.next()
 		return nil
 
@@ -199,6 +208,9 @@ func (s *stackParser) constraint_type() *parseErr {
 		}
 		if err := s.expect(lexer.RPAR, expectDelimiter); err != nil {
 			return err
+		}
+		if terminal := s.peekAt(1); terminal == EOF {
+			return &expectParenthesisClosed
 		}
 		s.next()
 		return nil
@@ -242,6 +254,9 @@ func (s *stackParser) constraint_type() *parseErr {
 		if err := s.expect(lexer.RPAR, expectDelimiter); err != nil {
 			return err
 		}
+		if terminal := s.peekAt(1); terminal == EOF {
+			return &expectParenthesisClosed
+		}
 		s.next()
 		return nil
 
@@ -256,7 +271,6 @@ func (s *stackParser) col_list() *parseErr {
 		return &expectIdentifier
 	}
 	s.next()
-
 	for {
 		if s.peekAt(0) != lexer.COMMA {
 			return nil

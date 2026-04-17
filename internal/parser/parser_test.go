@@ -287,3 +287,73 @@ func TestErrorCodes(t *testing.T) {
 		{"SELECT * FROM foo WHERE a 1", "WHERE missing relational operator", 208},
 	})
 }
+
+func TestCreateTableValid(t *testing.T) {
+	runValid(t, []validCase{
+		{
+			"CREATE TABLE foo (id Numeric(3) Not Null)",
+			"single numeric column not null",
+		},
+		{
+			"CREATE TABLE foo (name Char(50))",
+			"single char column",
+		},
+		{
+			"CREATE TABLE foo (id Numeric(3), name Char(50))",
+			"two columns",
+		},
+		{
+			"CREATE TABLE foo (salary Numeric(10,2))",
+			"numeric with precision and scale",
+		},
+		{
+			"CREATE TABLE foo (id Numeric(3) Not Null, name Char(50) Null)",
+			"mixed nullability",
+		},
+		{
+			"CREATE TABLE foo (id Numeric(3), Constraint PK Primary Key (id))",
+			"primary key constraint",
+		},
+		{
+			"CREATE TABLE foo (id Numeric(3), fk Numeric(3), Constraint FK Foreign Key foo(fk) References bar(id))",
+			"foreign key constraint",
+		},
+	})
+}
+
+func TestCreateTableInvalid(t *testing.T) {
+	runInvalid(t, []invalidCase{
+		{
+			"CREATE foo (id Numeric(3))",
+			"missing TABLE keyword",
+		},
+		{
+			"CREATE TABLE (id Numeric(3))",
+			"missing table name",
+		},
+		{
+			"CREATE TABLE foo id Numeric(3))",
+			"missing opening parenthesis",
+		},
+		{
+			"CREATE TABLE foo (id Numeric(3)",
+			"missing closing parenthesis",
+		},
+		{
+			"CREATE TABLE foo (id)",
+			"column without data type",
+		},
+		{
+			"CREATE TABLE foo (id Numeric)",
+			"numeric without parentheses",
+		},
+		{
+			"CREATE TABLE foo (id Numeric(3),)",
+			"trailing comma",
+		},
+		{
+			"CREATE TABLE foo ()",
+			"empty table body",
+		},
+	})
+}

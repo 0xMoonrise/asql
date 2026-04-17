@@ -212,35 +212,7 @@ DML_RULES = {
             )
         )
     ),
-    "CONDITION_EXPR": (
-        "Boolean condition",
-        Diagram(
-            Sequence(
-                Optional(Terminal("NOT")),
-                NonTerminal("NAME_EXPR"),
-                Choice(0,
-                    NonTerminal("WHERE_SUBQUERY"),
-                    Sequence(
-                        NonTerminal("RELATION_EXPR"),
-                        Choice(0,
-                            NonTerminal("CONSTANT"),
-                            NonTerminal("NAME_EXPR")
-                        ),
-                        Optional(
-                            Sequence(
-                                Choice(0,
-                                    Terminal("AND"),
-                                    Terminal("OR")
-                                ),
-                                Optional(Terminal("NOT")),
-                                NonTerminal("CONDITION_EXPR")
-                            )
-                        )
-                    )
-                )
-            )
-        )
-    ),
+
     "CONDITION_EXPR": (
         "Boolean condition",
         Diagram(
@@ -279,15 +251,12 @@ DML_RULES = {
             Terminal("("),
             NonTerminal("DML_EXPR"),
             Terminal(")"),
-            Optional(
-                Sequence(
-                    Choice(0,
-                        Terminal("AND"),
-                        Terminal("OR")
-                    ),
-                    Optional(Terminal("NOT")),
-                    NonTerminal("CONDITION_EXPR")
-                )
+            Sequence(
+                Choice(0,
+                    Terminal("AND"),
+                    Terminal("OR")
+                ),
+                NonTerminal("CONDITION_EXPR")
             )
         )
     )

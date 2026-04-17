@@ -183,8 +183,8 @@ ALIAS           := IDENTIFIER
 WHERE_CLAUSE    := WHERE CONDITION_EXPR
 CONDITION_EXPR  := NAME_EXPR [NOT] WHERE_SUBQUERY
                  | [NOT] NAME_EXPR RELATION_EXPR
-                   (CONSTANT | NAME_EXPR) { (AND | OR) [NOT] CONDITION_EXPR }
-WHERE_SUBQUERY  := IN LPAR DML_EXPR RPAR [ (AND | OR ) [NOT] CONDITION_EXPR ]
+                   (CONSTANT | NAME_EXPR) { (AND | OR) CONDITION_EXPR }
+WHERE_SUBQUERY  := IN LPAR DML_EXPR RPAR { (AND | OR) CONDITION_EXPR }
 RELATION_EXPR   := = | < | <= | > | >= | <>
         """, language="bnf")
         utils.grammar_tab(diagrams.DML_RULES)

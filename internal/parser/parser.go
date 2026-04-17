@@ -86,21 +86,19 @@ func (s *stackParser) popParStack() *parseErr {
 		if terminal := s.next(); terminal == EOF && s.parCounter != 0 {
 			return &expectParenthesisClosed
 		}
-
 		return nil
 	}
 	return &expectDelimiter
 }
 
 func NewParser(tokens []lexer.Token) *stackParser {
-	p := &stackParser{
+	return &stackParser{
 		ptr:        0,
 		depth:      0,
 		parCounter: 0,
 		stack:      tokens,
 		State:      ErrorState{},
 	}
-	return p
 }
 
 func (s *stackParser) NewErrState(err error) ErrorState {
