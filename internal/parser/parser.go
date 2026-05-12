@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/0xMoonrise/asql/internal/lexer"
 )
@@ -10,12 +11,14 @@ const EOF = -1
 const DEBUG = false
 const maxRecursion = 10
 
-type stackParser struct {
-	ptr        int
-	depth      int
-	parCounter int
-	stack      []lexer.Token
-	State      ErrorState
+type StackParser struct {
+	ptr          int
+	depth        int
+	parCounter   int
+	stack        []lexer.Token
+	State        ErrorState
+	Metadata     map[string][]string
+	currentTable string
 }
 
 type ErrorState struct {
@@ -24,21 +27,32 @@ type ErrorState struct {
 	Token   lexer.Token
 }
 
-func (s *stackParser) expect(value lexer.Value, err parseErr) *parseErr {
+func (s *StackParser) lexemeAt(offset int) string {
+	if t := s.tokenAt(offset); t != nil {
+		return strings.ToUpper(string(t.L))
+	}
+	return ""
+}
+
+func (s *StackParser) appendValue(header string, value string) {
+	s.Metadata[header] = append(s.Metadata[header], value)
+}
+
+func (s *StackParser) expect(value lexer.Value, err parseErr) *parseErr {
 	if s.stack[s.ptr].V == value {
 		return nil
 	}
 	return &err
 }
 
-func (s *stackParser) peekAt(position int) lexer.Value {
+func (s *StackParser) peekAt(position int) lexer.Value {
 	if s.ptr+position < len(s.stack) {
 		return s.stack[s.ptr+position].V
 	}
 	return EOF
 }
 
-func (s *stackParser) next() lexer.Value {
+func (s *StackParser) next() lexer.Value {
 	if s.ptr+1 < len(s.stack) {
 		s.ptr++
 		return s.stack[s.ptr].V
@@ -46,32 +60,33 @@ func (s *stackParser) next() lexer.Value {
 	return EOF
 }
 
-func (s *stackParser) tokenAt(position int) *lexer.Token {
-	if s.ptr+position < len(s.stack) {
-		return &s.stack[s.ptr+position]
+func (s *StackParser) tokenAt(position int) *lexer.Token {
+	idx := s.ptr + position
+	if idx >= 0 && idx < len(s.stack) {
+		return &s.stack[idx]
 	}
 	return nil
 }
 
-func (s *stackParser) isIdentifier() bool {
+func (s *StackParser) isIdentifier() bool {
 	terminal := s.peekAt(0)
 	return (terminal > 400 && terminal < 600)
 }
 
-func (s *stackParser) isRelation() bool {
+func (s *StackParser) isRelation() bool {
 	return s.tokenAt(0).T == 8
 }
 
-func (s *stackParser) isConstant() bool {
+func (s *StackParser) isConstant() bool {
 	return s.peekAt(0) >= 600
 }
 
-func (s *stackParser) isOpBool() bool {
+func (s *StackParser) isOpBool() bool {
 	v := s.peekAt(0)
 	return v == lexer.AND || v == lexer.OR || v == lexer.NOT
 }
 
-func (s *stackParser) pushParStack() *parseErr {
+func (s *StackParser) pushParStack() *parseErr {
 	if s.tokenAt(0).V == lexer.LPAR {
 		s.parCounter++
 		s.ptr++
@@ -80,7 +95,7 @@ func (s *stackParser) pushParStack() *parseErr {
 	return &expectDelimiter
 }
 
-func (s *stackParser) popParStack() *parseErr {
+func (s *StackParser) popParStack() *parseErr {
 	if s.tokenAt(0).V == lexer.RPAR {
 		s.parCounter--
 		if terminal := s.next(); terminal == EOF && s.parCounter != 0 {
@@ -91,17 +106,24 @@ func (s *stackParser) popParStack() *parseErr {
 	return &expectDelimiter
 }
 
-func NewParser(tokens []lexer.Token) *stackParser {
-	return &stackParser{
+func NewParser(tokens []lexer.Token) *StackParser {
+	return &StackParser{
 		ptr:        0,
 		depth:      0,
 		parCounter: 0,
 		stack:      tokens,
 		State:      ErrorState{},
+		Metadata: map[string][]string{
+			"ct_tables":      {},
+			"insert_tables":  {},
+			"insert_values":  {},
+			"select_tables":  {},
+			"select_columns": {},
+		},
 	}
 }
 
-func (s *stackParser) NewErrState(err error) ErrorState {
+func (s *StackParser) NewErrState(err error) ErrorState {
 	return ErrorState{
 		Message: err,
 		Token:   *s.tokenAt(0),
@@ -109,41 +131,53 @@ func (s *stackParser) NewErrState(err error) ErrorState {
 	}
 }
 
-func (s *stackParser) Parse() *parseErr {
-
+func (s *StackParser) Parse() *parseErr {
 	if len(s.stack) == 0 {
 		return &emptyStack
 	}
 
-	if DEBUG == true {
+	if DEBUG {
 		for i, t := range s.stack {
 			fmt.Printf("[%d] L=%s V=%d T=%d\n", i, t.L, t.V, t.T)
 		}
 	}
 
-	switch s.stack[0].V {
-	case lexer.SELECT:
-		if err := s.dml_expr(); err != nil {
-			s.State = s.NewErrState(err)
-			fmt.Printf("failed at ptr=%d token=%v\n", s.ptr, s.stack[s.ptr])
-			return err
-		}
-	case lexer.CREATE:
-		if err := s.ddl_expr(); err != nil {
-			s.State = s.NewErrState(err)
-			fmt.Printf("failed at ptr=%d token=%v\n", s.ptr, s.stack[s.ptr])
-			return err
-		}
-	default:
-		err := &expectedKeywordAtStart
-		s.State = s.NewErrState(err)
-		return err
-	}
-
-	return nil
+	return s.script()
 }
 
-func (s *stackParser) safeRecursion() *parseErr {
+func (s *StackParser) script() *parseErr {
+	for {
+		if err := s.statement(); err != nil {
+			s.State = s.NewErrState(err)
+			fmt.Printf("failed at ptr=%d token=%v\n", s.ptr, s.stack[s.ptr])
+			return err
+		}
+
+		if err := s.expect(lexer.SCOLON, expectDelimiter); err != nil {
+			s.State = s.NewErrState(err)
+			return err
+		}
+
+		if next := s.next(); next == EOF {
+			return nil
+		}
+	}
+}
+
+func (s *StackParser) statement() *parseErr {
+	switch s.stack[s.ptr].V {
+	case lexer.SELECT:
+		return s.dml_expr()
+	case lexer.CREATE:
+		return s.ddl_expr()
+	case lexer.INSERT:
+		return s.expr_insert()
+	default:
+		return &expectedKeywordAtStart
+	}
+}
+
+func (s *StackParser) safeRecursion() *parseErr {
 	s.depth++
 	if s.depth > maxRecursion {
 		return &maxRecursionReached
@@ -151,12 +185,12 @@ func (s *stackParser) safeRecursion() *parseErr {
 	return nil
 }
 
-func (s *stackParser) unwind() {
+func (s *StackParser) unwind() {
 	s.depth--
 }
 
 // DML_EXPR := SELECT_EXPR FROM_EXPR [ WHERE_CLAUSE ]
-func (s *stackParser) dml_expr() *parseErr {
+func (s *StackParser) dml_expr() *parseErr {
 	if err := s.select_expr(); err != nil {
 		return err
 	}
@@ -177,8 +211,7 @@ func (s *stackParser) dml_expr() *parseErr {
 }
 
 // SELECT_EXPR := SELECT * | SELECT COLUMNS_EXPR
-func (s *stackParser) select_expr() *parseErr {
-
+func (s *StackParser) select_expr() *parseErr {
 	if err := s.expect(lexer.SELECT, expectKeyword); err != nil {
 		return err
 	}
@@ -188,6 +221,7 @@ func (s *stackParser) select_expr() *parseErr {
 
 	switch {
 	case terminal == lexer.TIMES:
+		s.appendValue("select_columns", "*")
 		s.next()
 	case s.isIdentifier():
 		return s.columns_expr()
@@ -197,14 +231,12 @@ func (s *stackParser) select_expr() *parseErr {
 	return nil
 }
 
-// columns_expr: ptr must point to the first identifier on entry
-// COLUMNS_EXPR := NAME_EXPR { , NAME_EXPR }
-func (s *stackParser) columns_expr() *parseErr {
-
+func (s *StackParser) columns_expr() *parseErr {
 	if err := s.name_expr(); err != nil {
 		return err
 	}
-
+	// registrar columna: puede ser "A" o "TABLA.A"
+	s.registerSelectColumn()
 	s.next()
 
 	for {
@@ -221,27 +253,45 @@ func (s *stackParser) columns_expr() *parseErr {
 		if err := s.name_expr(); err != nil {
 			return err
 		}
-
+		s.registerSelectColumn()
 		s.next()
 	}
 }
 
+func (s *StackParser) registerSelectColumn() {
+	t := s.tokenAt(0)
+	if t == nil {
+		return
+	}
+	col := strings.ToUpper(string(t.L))
+
+	prev := s.tokenAt(-1)
+	prevPrev := s.tokenAt(-2)
+	if prev != nil && prev.V == lexer.DOT &&
+		prevPrev != nil && s.isIdentifierValue(prevPrev.V) {
+		table := strings.ToUpper(string(prevPrev.L))
+		s.appendValue("select_columns", table+"."+col)
+		return
+	}
+
+	s.appendValue("select_columns", col)
+}
+
+func (s *StackParser) isIdentifierValue(v lexer.Value) bool {
+	return v > 400 && v < 600
+}
+
 // NAME_EXPR := IDENTIFIER | IDENTIFIER . IDENTIFIER
-// This piece of code is not a pure LL1, because is simplier
-// to implement a LL(k) grammar, taking the correct branch
-// in case of ambiguity
-func (s *stackParser) name_expr() *parseErr {
+func (s *StackParser) name_expr() *parseErr {
 	if !s.isIdentifier() {
 		return &expectIdentifier
 	}
 
-	// LL2
 	if s.peekAt(1) != lexer.DOT {
 		return nil
 	}
 
 	s.next()
-	// is always true just to clarify the sintax of the production
 	if err := s.expect(lexer.DOT, expectDelimiter); err != nil {
 		return err
 	}
@@ -251,9 +301,6 @@ func (s *stackParser) name_expr() *parseErr {
 		return &expectIdentifier
 	}
 
-	// case a.b.c is not expected, this solves the issue
-	// with the ambiguity of LL1 just because looking at 2 tokens
-	// transforming the grammar to LL2
 	if s.peekAt(1) == lexer.DOT {
 		return &expectDelimiter
 	}
@@ -261,8 +308,8 @@ func (s *stackParser) name_expr() *parseErr {
 	return nil
 }
 
-// DATABASES_EXPR := TABLE_EXPR { , TABLE_EXPR }
-func (s *stackParser) from_expr() *parseErr {
+// FROM_EXPR := FROM DATABASES_EXPR
+func (s *StackParser) from_expr() *parseErr {
 	if err := s.expect(lexer.FROM, expectKeyword); err != nil {
 		return err
 	}
@@ -277,7 +324,7 @@ func (s *stackParser) from_expr() *parseErr {
 }
 
 // DATABASES_EXPR := TABLE_EXPR | TABLE_EXPR , DATABASES_EXPR
-func (s *stackParser) databases_expr() *parseErr {
+func (s *StackParser) databases_expr() *parseErr {
 	if err := s.safeRecursion(); err != nil {
 		return err
 	}
@@ -289,7 +336,10 @@ func (s *stackParser) databases_expr() *parseErr {
 
 	for {
 		terminal := s.peekAt(0)
-		if terminal == EOF || terminal == lexer.WHERE || terminal == lexer.RPAR {
+		if terminal == EOF ||
+			terminal == lexer.WHERE ||
+			terminal == lexer.RPAR ||
+			terminal == lexer.SCOLON {
 			return nil
 		}
 		if s.isIdentifier() {
@@ -309,8 +359,7 @@ func (s *stackParser) databases_expr() *parseErr {
 }
 
 // TABLE_EXPR := NAME_EXPR [ ALIAS ] | ( DML_EXPR ) ALIAS
-func (s *stackParser) table_expr() *parseErr {
-
+func (s *StackParser) table_expr() *parseErr {
 	if s.peekAt(0) == lexer.LPAR {
 		if err := s.pushParStack(); err != nil {
 			return err
@@ -333,6 +382,7 @@ func (s *stackParser) table_expr() *parseErr {
 	if err := s.name_expr(); err != nil {
 		return err
 	}
+	s.registerSelectTable()
 
 	if next := s.next(); next == EOF {
 		return nil
@@ -348,20 +398,38 @@ func (s *stackParser) table_expr() *parseErr {
 	return nil
 }
 
-// check if the pointer is in the end of expression
-func (s *stackParser) expectTableTerminator() *parseErr {
+func (s *StackParser) registerSelectTable() {
+	t := s.tokenAt(0)
+	if t == nil {
+		return
+	}
+	name := strings.ToUpper(string(t.L))
+
+	prev := s.tokenAt(-1)
+	prevPrev := s.tokenAt(-2)
+	if prev != nil && prev.V == lexer.DOT &&
+		prevPrev != nil && s.isIdentifierValue(prevPrev.V) {
+		s.appendValue("select_tables", name)
+		return
+	}
+
+	s.appendValue("select_tables", name)
+}
+
+func (s *StackParser) expectTableTerminator() *parseErr {
 	terminal := s.peekAt(0)
 	if terminal == EOF ||
 		terminal == lexer.WHERE ||
 		terminal == lexer.RPAR ||
-		terminal == lexer.COMMA {
+		terminal == lexer.COMMA ||
+		terminal == lexer.SCOLON {
 		return nil
 	}
 	return &unexpectedToken
 }
 
 // WHERE_CLAUSE := WHERE CONDITION_EXPR
-func (s *stackParser) where_clause() *parseErr {
+func (s *StackParser) where_clause() *parseErr {
 	if err := s.expect(lexer.WHERE, expectKeyword); err != nil {
 		return err
 	}
@@ -376,11 +444,10 @@ func (s *stackParser) where_clause() *parseErr {
 }
 
 // CONDITION_EXPR := [NOT] NAME_EXPR RELATION_EXPR CONSTANT  { (AND | OR) [NOT] CONDITION_EXPR }
-//                 | [NOT] NAME_EXPR RELATION_EXPR NAME_EXPR { (AND | OR) [NOT] CONDITION_EXPR }
-//                 | NAME_EXPR [NOT] WHERE_SUBQUERY
-
-func (s *stackParser) condition_expr() *parseErr {
-
+//
+//	| [NOT] NAME_EXPR RELATION_EXPR NAME_EXPR { (AND | OR) [NOT] CONDITION_EXPR }
+//	| NAME_EXPR [NOT] WHERE_SUBQUERY
+func (s *StackParser) condition_expr() *parseErr {
 	if err := s.safeRecursion(); err != nil {
 		return err
 	}
@@ -389,6 +456,8 @@ func (s *stackParser) condition_expr() *parseErr {
 	if err := s.name_expr(); err != nil {
 		return err
 	}
+
+	whereCol := s.lexemeAt(0)
 
 	s.next()
 	if s.peekAt(0) == lexer.NOT {
@@ -403,9 +472,15 @@ func (s *stackParser) condition_expr() *parseErr {
 		return &expectRelational
 	}
 
+	whereOp := string(s.tokenAt(0).L)
+
 	s.next()
 	switch {
 	case s.isConstant():
+		whereVal := string(s.tokenAt(0).L)
+		s.appendValue("where_col", whereCol)
+		s.appendValue("where_op", whereOp)
+		s.appendValue("where_val", whereVal)
 	case s.isIdentifier():
 		if err := s.name_expr(); err != nil {
 			return err
@@ -414,7 +489,9 @@ func (s *stackParser) condition_expr() *parseErr {
 		return &expectedConstOrIdent
 	}
 
-	if terminal := s.next(); terminal == EOF || terminal == lexer.RPAR {
+	if terminal := s.next(); terminal == EOF ||
+		terminal == lexer.RPAR ||
+		terminal == lexer.SCOLON {
 		return nil
 	}
 
@@ -436,7 +513,7 @@ func (s *stackParser) condition_expr() *parseErr {
 }
 
 // WHERE_SUBQUERY := IN ( DML_EXPR ) [ AND | OR [ NOT ] CONDITION_EXPR ]
-func (s *stackParser) where_subquery_expr() *parseErr {
+func (s *StackParser) where_subquery_expr() *parseErr {
 	s.next()
 	if err := s.pushParStack(); err != nil {
 		return err
@@ -449,7 +526,7 @@ func (s *stackParser) where_subquery_expr() *parseErr {
 	}
 
 	terminal := s.peekAt(0)
-	if terminal == EOF || terminal == lexer.RPAR {
+	if terminal == EOF || terminal == lexer.RPAR || terminal == lexer.SCOLON {
 		return nil
 	}
 
@@ -467,7 +544,7 @@ func (s *stackParser) where_subquery_expr() *parseErr {
 }
 
 // RELATION_EXPR := = | < | <= | > | >= | <>
-func (s *stackParser) relation_expr() *parseErr {
+func (s *StackParser) relation_expr() *parseErr {
 	if !s.isRelation() {
 		return &expectRelational
 	}

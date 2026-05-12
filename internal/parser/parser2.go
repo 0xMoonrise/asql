@@ -1,11 +1,13 @@
 package parser
 
 import (
+	"strings"
+
 	"github.com/0xMoonrise/asql/internal/lexer"
 )
 
 // DDL_EXPR := CREATE TABLE IDENTIFIER ( TABLE_BODY )
-func (s *stackParser) ddl_expr() *parseErr {
+func (s *StackParser) ddl_expr() *parseErr {
 	if err := s.expect(lexer.CREATE, expectKeyword); err != nil {
 		return err
 	}
@@ -17,6 +19,11 @@ func (s *stackParser) ddl_expr() *parseErr {
 	if !s.isIdentifier() {
 		return &expectIdentifier
 	}
+
+	tableName := strings.ToUpper(s.lexemeAt(0))
+	s.appendValue("ct_tables", tableName)
+	s.currentTable = tableName
+
 	s.next()
 	if err := s.expect(lexer.LPAR, expectDelimiter); err != nil {
 		return err
@@ -29,11 +36,13 @@ func (s *stackParser) ddl_expr() *parseErr {
 		return err
 	}
 	s.next()
+
+	s.currentTable = ""
 	return nil
 }
 
 // TABLE_BODY := (COLUMN_DEF | CONSTRAINT_DEF) { , (COLUMN_DEF | CONSTRAINT_DEF) }
-func (s *stackParser) table_body() *parseErr {
+func (s *StackParser) table_body() *parseErr {
 	if err := s.table_body_item(); err != nil {
 		return err
 	}
@@ -49,7 +58,7 @@ func (s *stackParser) table_body() *parseErr {
 	}
 }
 
-func (s *stackParser) table_body_item() *parseErr {
+func (s *StackParser) table_body_item() *parseErr {
 	if s.peekAt(0) == lexer.CONSTRAIN {
 		return s.constraint_def()
 	}
@@ -57,10 +66,16 @@ func (s *stackParser) table_body_item() *parseErr {
 }
 
 // COLUMN_DEF := IDENTIFIER DATA_TYPE [ NULLABILITY ]
-func (s *stackParser) column_def() *parseErr {
+func (s *StackParser) column_def() *parseErr {
 	if !s.isIdentifier() {
 		return &expectIdentifier
 	}
+
+	colName := strings.ToUpper(s.lexemeAt(0))
+	if s.currentTable != "" {
+		s.appendValue("ct_columns:"+s.currentTable, colName)
+	}
+
 	s.next()
 	if err := s.data_type(); err != nil {
 		return err
@@ -72,13 +87,22 @@ func (s *stackParser) column_def() *parseErr {
 }
 
 // DATA_TYPE := NUMERIC_TYPE | CHAR_TYPE | DATE
-func (s *stackParser) data_type() *parseErr {
+func (s *StackParser) data_type() *parseErr {
 	switch s.peekAt(0) {
 	case lexer.NUMERIC:
+		if s.currentTable != "" {
+			s.appendValue("ct_types:"+s.currentTable, "NUMERIC")
+		}
 		return s.numeric_type()
 	case lexer.CHAR:
+		if s.currentTable != "" {
+			s.appendValue("ct_types:"+s.currentTable, "CHAR")
+		}
 		return s.char_type()
 	case lexer.DATE:
+		if s.currentTable != "" {
+			s.appendValue("ct_types:"+s.currentTable, "DATE")
+		}
 		s.next()
 		return nil
 	default:
@@ -87,7 +111,7 @@ func (s *stackParser) data_type() *parseErr {
 }
 
 // NUMERIC_TYPE := NUMERIC ( INTEGER [ , INTEGER ] )
-func (s *stackParser) numeric_type() *parseErr {
+func (s *StackParser) numeric_type() *parseErr {
 	if err := s.expect(lexer.NUMERIC, expectKeyword); err != nil {
 		return err
 	}
@@ -118,7 +142,7 @@ func (s *stackParser) numeric_type() *parseErr {
 }
 
 // CHAR_TYPE := CHAR ( INTEGER )
-func (s *stackParser) char_type() *parseErr {
+func (s *StackParser) char_type() *parseErr {
 	if err := s.expect(lexer.CHAR, expectKeyword); err != nil {
 		return err
 	}
@@ -142,7 +166,7 @@ func (s *stackParser) char_type() *parseErr {
 }
 
 // NULLABILITY := NOT NULL | NULL
-func (s *stackParser) nullability() *parseErr {
+func (s *StackParser) nullability() *parseErr {
 	switch s.peekAt(0) {
 	case lexer.NOT:
 		s.next()
@@ -157,7 +181,7 @@ func (s *stackParser) nullability() *parseErr {
 }
 
 // CONSTRAINT_DEF := CONSTRAINT IDENTIFIER CONSTRAINT_TYPE
-func (s *stackParser) constraint_def() *parseErr {
+func (s *StackParser) constraint_def() *parseErr {
 	if err := s.expect(lexer.CONSTRAIN, expectKeyword); err != nil {
 		return err
 	}
@@ -165,15 +189,21 @@ func (s *stackParser) constraint_def() *parseErr {
 	if !s.isIdentifier() {
 		return &expectIdentifier
 	}
+
+	constraintName := strings.ToUpper(s.lexemeAt(0))
+	if s.currentTable != "" {
+		s.appendValue("ct_constraints:"+s.currentTable, constraintName)
+	}
+
 	s.next()
 	return s.constraint_type()
 }
 
 // CONSTRAINT_TYPE := PRIMARY KEY ( COL_LIST )
-//                  | CHECK ( CONDITION )
-//                  | FOREIGN KEY IDENTIFIER ( COL_LIST ) REFERENCES IDENTIFIER ( COL_LIST )
-
-func (s *stackParser) constraint_type() *parseErr {
+//
+//	| CHECK ( CONDITION )
+//	| FOREIGN KEY IDENTIFIER ( COL_LIST ) REFERENCES IDENTIFIER ( COL_LIST )
+func (s *StackParser) constraint_type() *parseErr {
 	switch s.peekAt(0) {
 	case lexer.PRIMARY:
 		s.next()
@@ -221,10 +251,7 @@ func (s *stackParser) constraint_type() *parseErr {
 			return err
 		}
 		s.next()
-		if !s.isIdentifier() {
-			return &expectIdentifier
-		}
-		s.next()
+		// FOREIGN KEY ( COL_LIST ) REFERENCES IDENTIFIER ( COL_LIST )
 		if err := s.expect(lexer.LPAR, expectDelimiter); err != nil {
 			return err
 		}
@@ -266,7 +293,7 @@ func (s *stackParser) constraint_type() *parseErr {
 }
 
 // COL_LIST := IDENTIFIER { , IDENTIFIER }
-func (s *stackParser) col_list() *parseErr {
+func (s *StackParser) col_list() *parseErr {
 	if !s.isIdentifier() {
 		return &expectIdentifier
 	}

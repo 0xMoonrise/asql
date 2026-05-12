@@ -3,37 +3,62 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
-	"github.com/0xMoonrise/asql/internal/lexer"
-	"github.com/0xMoonrise/asql/internal/parser"
+	"github.com/0xMoonrise/asql/internal/kernel"
+	"github.com/chzyer/readline"
 )
 
 func run() error {
+	k := kernel.NewKernel("db.json")
 
-	reader, err := readFile()
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:          "asql> ",
+		HistoryFile:     os.TempDir() + "/asql_history",
+		InterruptPrompt: "^C",
+		EOFPrompt:       ".exit",
+	})
 	if err != nil {
 		return err
 	}
+	defer rl.Close()
 
-	source := readFromFile(reader)
+	fmt.Println("Mini SQL shell. Asql 0.1v")
 
-	// Lexer: satage 1
-	tokenStream, lexerErrors := lexer.Lexer(source)
-	// lexer.PrintLexer(tokenStream)
+	var sql strings.Builder
 
-	for _, state := range lexerErrors {
-		fmt.Println("[Lexer]", state.Err.Error(), "line", state.Line, "token", state.L)
+	for {
+		line, err := rl.Readline()
+		if err != nil {
+			break
+		}
+
+		if strings.TrimSpace(line) == ".exit" {
+			break
+		}
+
+		if sql.Len() == 0 && strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		sql.WriteString(line)
+		sql.WriteString("\n")
+
+		if strings.Contains(line, ";") {
+			stmt := strings.TrimSpace(sql.String())
+			if err := k.ProcessSQL(stmt); err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+			}
+			sql.Reset()
+			rl.SetPrompt("asql> ")
+		} else {
+			rl.SetPrompt("   -> ")
+		}
 	}
 
-	// Parser: stage 2
-	parser := parser.NewParser(tokenStream)
-	if err := parser.Parse(); err != nil {
-		fmt.Println("[Parser]", parser.State.Message.Error())
-		line := parser.State.Token.Line
-		fmt.Printf("[Line: %d] %s ", line, strings.Join(source[line-1], " "))
-	}
-	return err
+	fmt.Println("bye")
+	return nil
 }
 
 func main() {

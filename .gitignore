@@ -7,3 +7,4 @@ streamlit/__pycache__/*
 code.asql
 asql
 .env*
+db.json

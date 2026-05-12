@@ -39,6 +39,7 @@ const (
 	LPAR
 	RPAR
 	APOS
+	SCOLON
 )
 
 // operators
