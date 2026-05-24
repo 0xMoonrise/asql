@@ -22,7 +22,7 @@ logging.basicConfig(
 app_url = os.getenv("APP_URL", "http://localhost:8080")
 custom_buttons = [
     {
-        "name": "Run",
+        "name": "Parse",
         "feather": "Play",
         "primary": True,
         "hasText": True,
@@ -36,6 +36,14 @@ custom_buttons = [
         "hasText": True,
         "commands": ["copyAll"],
         "style": {"bottom": "3.2rem", "right": "0.4rem"},
+    },
+    {
+        "name": "Exec",
+        "feather": "Play",
+        "primary": True,
+        "hasText": True,
+        "commands": ["submit"],
+        "style": {"bottom": "0.44rem", "right": "0.4rem"},
     }
 ]
 
@@ -90,7 +98,7 @@ if response["type"] == "submit" and response["text"]:
         logging.error(e)
         st.error("Application error")
 
-tab_lexer, tab_parser, tab_AST, tab_grammar = st.tabs(["Lexer", "Parser", "AST", "Grammar"])
+tab_lexer, tab_parser, tab_AST, tab_grammar = st.tabs(["Lexer", "Parser", "Grammar", "SQL"])
 with tab_lexer:
     if "data" not in st.session_state \
        or not st.session_state["data"]:

@@ -19,13 +19,14 @@ func run() error {
 		InterruptPrompt: "^C",
 		EOFPrompt:       ".exit",
 	})
+
 	if err != nil {
 		return err
 	}
+
 	defer rl.Close()
 
 	fmt.Println("Mini SQL shell. Asql 0.1v")
-
 	var sql strings.Builder
 
 	for {

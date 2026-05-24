@@ -40,7 +40,7 @@ func (s *StackParser) expr_insert() *parseErr {
 
 // LIST_ATTR := CONSTANT { , CONSTANT } )
 func (s *StackParser) list_attr() *parseErr {
-	if !s.isConstant() {
+	if !s.isConstant() && s.peekAt(0) != lexer.NULL {
 		return &expectConstant
 	}
 
@@ -56,10 +56,9 @@ func (s *StackParser) list_attr() *parseErr {
 			return err
 		}
 		s.next()
-		if !s.isConstant() {
+		if !s.isConstant() && s.peekAt(0) != lexer.NULL {
 			return &expectConstant
 		}
-
 		s.appendValue("insert_values", string(s.tokenAt(0).L))
 		s.next()
 	}

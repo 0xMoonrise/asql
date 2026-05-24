@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/0xMoonrise/asql/internal/lexer"
@@ -31,6 +32,8 @@ const (
 	CodeDuplicateConstraint = 303
 	CodeTableNotFound       = 304
 	CodeColumnNotFound      = 305
+	CodeTypeMismatch        = 306
+	CodeConstraintMismatch  = 307
 )
 
 type Column struct {
@@ -85,9 +88,11 @@ func (k *Kernel) save() error {
 }
 
 func (k *Kernel) ProcessSQL(sql string) error {
+
 	tokensRaw := lexer.Tokenize(sql)
 	lines := [][]string{tokensRaw}
 	tokensStream, errs := lexer.Lexer(lines)
+
 	if len(errs) > 0 {
 		return fmt.Errorf("lexer errors: %v", errs)
 	}
@@ -121,17 +126,15 @@ func (k *Kernel) ProcessSQL(sql string) error {
 }
 
 func (k *Kernel) handleCreateTable(meta map[string][]string) error {
-
 	for _, tableName := range meta["ct_tables"] {
 		if _, exists := k.catalog.Tables[tableName]; exists {
 			return &KernelError{CodeDuplicateTable, fmt.Sprintf("Table '%s' already exists", tableName)}
 		}
 
-		colKey := "ct_columns:" + tableName
-		colNames := meta[colKey]
-		conKey := "ct_constraints:" + tableName
-		constraintNames := meta[conKey]
+		colNames := meta["ct_columns:"+tableName]
 		colTypes := meta["ct_types:"+tableName]
+		colNullable := meta["ct_nullable:"+tableName]
+		constraintNames := meta["ct_constraints:"+tableName]
 
 		newTable := Table{
 			Name:        tableName,
@@ -142,17 +145,20 @@ func (k *Kernel) handleCreateTable(meta map[string][]string) error {
 
 		colSet := make(map[string]bool)
 		for i, col := range colNames {
-			dt := DataType(colTypes[i])
 			if colSet[col] {
 				return &KernelError{CodeDuplicateColumn, fmt.Sprintf("Duplicate column '%s' in table '%s'", col, tableName)}
 			}
-
 			colSet[col] = true
+
+			nullable := true
+			if i < len(colNullable) {
+				nullable = colNullable[i] == "true"
+			}
 
 			newTable.Columns = append(newTable.Columns, Column{
 				Name:     col,
-				DataType: dt,
-				Nullable: true,
+				DataType: DataType(colTypes[i]),
+				Nullable: nullable,
 			})
 		}
 
@@ -179,49 +185,54 @@ func (k *Kernel) handleInsert(meta map[string][]string) error {
 		return &KernelError{CodeTableNotFound, fmt.Sprintf("Table '%s' not found", tableName)}
 	}
 
-	expected := len(table.Columns)
-	if len(values) != expected {
+	if len(values) != len(table.Columns) {
 		return errors.New("number of values does not match number of columns")
 	}
 
 	row := make(map[string]any)
 	for i, col := range table.Columns {
 		raw := values[i]
-		isString := strings.HasPrefix(raw, "'") && strings.HasSuffix(raw, "'")
 
+		if strings.ToUpper(raw) == "NULL" {
+			if !col.Nullable {
+				return &KernelError{
+					CodeConstraintMismatch,
+					fmt.Sprintf("column '%s' is NOT NULL, cannot insert NULL", col.Name),
+				}
+			}
+			row[col.Name] = nil
+			continue
+		}
+
+		isString := strings.HasPrefix(raw, "'") && strings.HasSuffix(raw, "'")
 		switch col.DataType {
 		case TypeNumeric:
 			if isString {
 				return &KernelError{
-					CodeColumnNotFound,
+					CodeTypeMismatch,
 					fmt.Sprintf("column '%s' expects NUMERIC, got string '%s'", col.Name, raw),
 				}
 			}
 		case TypeChar, TypeDate:
 			if !isString {
 				return &KernelError{
-					CodeColumnNotFound,
+					CodeTypeMismatch,
 					fmt.Sprintf("column '%s' expects %s, got NUMERIC '%s'", col.Name, col.DataType, raw),
 				}
 			}
 		}
 
-		if strings.HasPrefix(raw, "'") && strings.HasSuffix(raw, "'") {
-			raw = raw[1 : len(raw)-1]
-			row[col.Name] = raw
+		if isString {
+			row[col.Name] = raw[1 : len(raw)-1]
 		} else {
 			var num float64
-			if _, err := fmt.Sscan(raw, &num); err == nil {
-				row[col.Name] = num
-			} else {
-				row[col.Name] = raw
-			}
+			fmt.Sscan(raw, &num)
+			row[col.Name] = num
 		}
 	}
 
 	table.Rows = append(table.Rows, row)
 	k.catalog.Tables[tableName] = table
-
 	return k.save()
 }
 
@@ -283,7 +294,10 @@ func (k *Kernel) handleSelect(meta map[string][]string) error {
 				return &KernelError{CodeColumnNotFound, fmt.Sprintf("Column '%s' not found in table '%s'", colName, tableName)}
 			}
 
-			selected = append(selected, SelectedColumn{TableName: tableName, ColumnName: colName})
+			selected = append(selected, SelectedColumn{
+				TableName:  tableName,
+				ColumnName: colName,
+			})
 		}
 	}
 
@@ -391,52 +405,53 @@ func (k *Kernel) handleSelect(meta map[string][]string) error {
 }
 
 func (k *Kernel) matchRow(row map[string]any, col string, op string, val string) (bool, error) {
-	isString := strings.HasPrefix(val, "'") && strings.HasSuffix(val, "'")
-	if isString && op != "=" {
-		return false, fmt.Errorf("string values only support '=' operator, got '%s'", op)
-	}
-	cleanVal := val
-	if isString {
-		cleanVal = val[1 : len(val)-1]
-	}
-
 	var rowVal any
-	var found bool
 	for k, v := range row {
 		parts := strings.Split(k, ".")
 		if parts[len(parts)-1] == col || k == col {
 			rowVal = v
-			found = true
 			break
 		}
 	}
-	if !found {
+	if rowVal == nil {
 		return false, nil
 	}
 
 	rowStr := fmt.Sprintf("%v", rowVal)
+
+	if strings.HasPrefix(val, "'") {
+		cleanVal := val[1 : len(val)-1]
+		switch op {
+		case "=":
+			return rowStr == cleanVal, nil
+		case "<>":
+			return rowStr != cleanVal, nil
+		}
+		return false, fmt.Errorf("string values only support '=' and '<>' operators, got '%s'", op)
+	}
+
+	na, errA := strconv.ParseFloat(rowStr, 64)
+	nb, errB := strconv.ParseFloat(val, 64)
+	if errA != nil || errB != nil {
+		return false, fmt.Errorf("cannot compare non-numeric values with '%s'", op)
+	}
+
 	switch op {
 	case "=":
-		return rowStr == cleanVal, nil
-	case ">":
-		return compareNumeric(rowStr, cleanVal) > 0, nil
-	case "<":
-		return compareNumeric(rowStr, cleanVal) < 0, nil
-	case ">=":
-		return compareNumeric(rowStr, cleanVal) >= 0, nil
-	case "<=":
-		return compareNumeric(rowStr, cleanVal) <= 0, nil
+		return na == nb, nil
 	case "<>":
-		return rowStr != cleanVal, nil
+		return na != nb, nil
+	case ">":
+		return na > nb, nil
+	case "<":
+		return na < nb, nil
+	case ">=":
+		return na >= nb, nil
+	case "<=":
+		return na <= nb, nil
 	}
-	return false, nil
-}
 
-func compareNumeric(a, b string) float64 {
-	var na, nb float64
-	fmt.Sscan(a, &na)
-	fmt.Sscan(b, &nb)
-	return na - nb
+	return false, nil
 }
 
 func (e *KernelError) Error() string {

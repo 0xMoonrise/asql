@@ -80,10 +80,15 @@ func (s *StackParser) column_def() *parseErr {
 	if err := s.data_type(); err != nil {
 		return err
 	}
-	if err := s.nullability(); err != nil {
+
+	nullKey := "ct_nullable:" + s.currentTable
+	s.appendValue(nullKey, "true")
+
+	if err := s.nullability(nullKey); err != nil {
 		return err
 	}
 	return nil
+
 }
 
 // DATA_TYPE := NUMERIC_TYPE | CHAR_TYPE | DATE
@@ -115,7 +120,12 @@ func (s *StackParser) numeric_type() *parseErr {
 	if err := s.expect(lexer.NUMERIC, expectKeyword); err != nil {
 		return err
 	}
+
 	s.next()
+	if s.peekAt(0) == lexer.COMMA || s.peekAt(0) == lexer.NOT || s.peekAt(0) == lexer.RPAR {
+		return nil
+	}
+
 	if err := s.expect(lexer.LPAR, expectDelimiter); err != nil {
 		return err
 	}
@@ -141,12 +151,17 @@ func (s *StackParser) numeric_type() *parseErr {
 	return nil
 }
 
-// CHAR_TYPE := CHAR ( INTEGER )
+// CHAR_TYPE := CHAR | CHAR( INTEGER )
 func (s *StackParser) char_type() *parseErr {
 	if err := s.expect(lexer.CHAR, expectKeyword); err != nil {
 		return err
 	}
+
 	s.next()
+	if s.peekAt(0) == lexer.COMMA || s.peekAt(0) == lexer.NOT || s.peekAt(0) == lexer.RPAR {
+		return nil
+	}
+
 	if err := s.expect(lexer.LPAR, expectDelimiter); err != nil {
 		return err
 	}
@@ -166,7 +181,7 @@ func (s *StackParser) char_type() *parseErr {
 }
 
 // NULLABILITY := NOT NULL | NULL
-func (s *StackParser) nullability() *parseErr {
+func (s *StackParser) nullability(key string) *parseErr {
 	switch s.peekAt(0) {
 	case lexer.NOT:
 		s.next()
@@ -174,6 +189,9 @@ func (s *StackParser) nullability() *parseErr {
 			return err
 		}
 		s.next()
+		slice := s.Metadata[key]
+		slice[len(slice)-1] = "false"
+		s.Metadata[key] = slice
 	case lexer.NULL:
 		s.next()
 	}

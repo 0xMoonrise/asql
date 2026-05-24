@@ -5,9 +5,9 @@ A systems programming project that explores the fundamentals of compilers, apply
 ## Project Stages
 
 - [x] **Lexer:** Developed a tokenizer and lexer rules to differentiate tokens that belong to the syntactic table from those that do not.
-- [ ] **Parser:** Build a parser and an AST (Abstract Syntax Tree) to determine the correct token sequence and verify that the grammar is correct.
-- [ ] **Semantics:** Implementation of a semantic checker to detect compilation errors and type verification.
-- [ ] **Optimization:** Final stage of the project where language ambiguities will be addressed and overall performance will be optimized.
+- [x] **Parser:** Build a parser and an AST (Abstract Syntax Tree) to determine the correct token sequence and verify that the grammar is correct.
+- [x] **Semantics:** Implementation of a semantic checker to detect compilation errors and type verification.
+- [x] **Optimization:** Final stage of the project where language ambiguities will be addressed and overall performance will be optimized.
 
 ## Architecture
 
